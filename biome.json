@@ -4,14 +4,14 @@
   "files": {
     "includes": [
       "**",
-      "!blueprints/**",
-      "!.next/**",
-      "!node_modules/**",
-      "!src/generated/**",
-      "!.storage/**",
-      "!backups/**",
-      "!test-results/**",
-      "!playwright-report/**"
+      "!blueprints",
+      "!.next",
+      "!node_modules",
+      "!src/generated",
+      "!.storage",
+      "!backups",
+      "!test-results",
+      "!playwright-report"
     ]
   },
   "formatter": {

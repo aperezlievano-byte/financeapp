@@ -13,7 +13,10 @@ function writePng(): void {
     join(here, "receipt-sample.png.base64"),
     "utf8",
   ).trim();
-  writeFileSync(join(here, "receipt-sample.png"), Buffer.from(base64, "base64"));
+  writeFileSync(
+    join(here, "receipt-sample.png"),
+    Buffer.from(base64, "base64"),
+  );
 }
 
 async function writeWorkbook(): Promise<void> {
