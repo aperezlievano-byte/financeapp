@@ -54,8 +54,8 @@ prisma/
   schema.prisma        # única fuente de verdad del esquema — NEW (E1-T2)
   migrations/          # SQL generado por prisma migrate; una aplicada NUNCA se edita — NEW (E1-T2)
   seed.ts              # cuentas y categorías del único usuario — NEW (E1-T2)
-proxy.ts               # NO middleware.ts — redirige anónimos a /login — NEW (E1-T1), edit (E1-T3)
 src/
+  proxy.ts             # NO middleware.ts — mismo nivel que app/ bajo --src-dir — NEW (E1-T1), edit (E1-T3)
   app/
     globals.css        # @theme con los tokens de diseño — NEW (E1-T1)
     login/
@@ -168,7 +168,8 @@ E1-T5 rompa el gate de este paso. `proxy.ts` redirige a `/login` toda petición 
 **Files**
 - `src/lib/env.ts` — new
 - `src/app/login/page.tsx` — new: Server Component con el formulario, sin acción todavía
-- `proxy.ts` — new: exporta `proxy`, no `middleware`
+- `src/proxy.ts` — new: exporta `proxy`, no `middleware`. Vive en `src/`, no en la raíz — con
+  `--src-dir` Next 16 solo detecta `proxy.ts` al mismo nivel que `app/`
 - `src/app/globals.css` — new: tokens dentro de `@theme` más `prefers-reduced-motion`
 - `tests/unit/env.test.ts` — new
 
@@ -268,7 +269,7 @@ conjunción es lo que impide que el bypass se active jamás contra la base real.
 - `src/lib/auth/guard.ts` — new: `requireUser()` y `e2eBypassUserId()`
 - `src/app/login/actions.ts` — new: acción de sign-in contra Supabase Auth
 - `src/app/login/page.tsx` — edit: conecta la acción
-- `proxy.ts` — edit: ahora valida el token
+- `src/proxy.ts` — edit: ahora valida el token
 - `tests/unit/guard.test.ts` — new
 
 **Acceptance**

@@ -115,6 +115,7 @@ personal-finance-app/                # raíz — el bundle vive DENTRO de ella
     parity-check.ts                  # compara el libro contra la hoja de Excel — paso 13
     set-telegram-webhook.ts          # registra el webhook con PRODUCTION_URL — paso 14
   src/
+    proxy.ts                         # NO middleware.ts — mismo nivel que app/ bajo --src-dir — paso 1
     app/
       globals.css                    # @theme con los tokens de §7 — paso 1
       login/{page.tsx,actions.ts}    # única ruta pública — pasos 1 y 3
@@ -173,7 +174,6 @@ personal-finance-app/                # raíz — el bundle vive DENTRO de ella
   docker-compose.yml                 # Postgres local en el puerto 5433 del host
   next.config.ts · postcss.config.mjs · package.json · tsconfig.json
   playwright.config.ts               # e2e en el puerto 3101, testIgnore de blueprints/
-  proxy.ts                           # NO middleware.ts — redirige anónimos a /login
   vitest.config.ts                   # unit + integration, exclude de blueprints/
   CLAUDE.md · AGENTS.md
 ```
@@ -793,7 +793,7 @@ El Bootstrap de §10 ya dejó el andamio, `biome.json`, `.gitignore`, el reposit
 
 - `src/lib/env.ts` — el **único** archivo que lee `process.env`. Esquema zod con dos niveles: el conjunto **siempre obligatorio** (`APP_USER_ID`, `DATABASE_URL`, `DIRECT_DATABASE_URL`, `TEST_DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `STORAGE_DRIVER`, `STORAGE_LOCAL_DIR`) que se valida al importar, y el resto **opcional**, expuesto por funciones `requireAnthropic()`, `requireTelegram()`, `requireSupabaseStorage()` que lanzan solo cuando se invocan. Esa degradación es lo que impide que el paso 5 rompa el gate del paso 1.
 - `src/app/login/page.tsx` — Server Component con el formulario (correo, contraseña, botón). Todavía sin acción: el paso 3 la conecta. Un `<h1>`, etiquetas programáticas en ambos campos.
-- `proxy.ts` — exporta `proxy`, no `middleware`. Redirige a `/login` toda petición sin la cookie `pfa_at`, excepto `/login`, `/api/*`, `/_next/*` y estáticos. Todavía no valida el token: eso es el paso 3.
+- `src/proxy.ts` — exporta `proxy`, no `middleware`. Vive en `src/`, al mismo nivel que `app/`: con `--src-dir` Next 16 no detecta un `proxy.ts` en la raíz del repo. Redirige a `/login` toda petición sin la cookie `pfa_at`, excepto `/login`, `/api/*`, `/_next/*` y estáticos. Todavía no valida el token: eso es el paso 3.
 - `src/app/globals.css` — los tokens de §7 dentro de `@theme`, más la regla global de `prefers-reduced-motion`.
 - `tests/unit/env.test.ts` — al menos un caso por rama: el conjunto obligatorio completo carga; falta uno y lanza nombrándolo; falta `ANTHROPIC_API_KEY` y **no** lanza.
 
@@ -872,7 +872,7 @@ git ls-files --error-unmatch prisma/schema.prisma   # expect: exit 0
 - `src/lib/auth/guard.ts` — `requireUser()`, `resolveSession(accessToken)`, `e2eBypassUserId()`. El bypass de e2e se activa **solo si se cumplen las tres condiciones a la vez**: `E2E_USER_ID` está definida, `DATABASE_URL` termina en `_test`, y `DATABASE_URL === E2E_DATABASE_URL`. Esas dos variables las define exclusivamente `playwright.config.ts` y no aparecen en ningún `.env`, de modo que ningún archivo de entorno puede activar el bypass en producción.
 - `src/app/login/actions.ts` — `signIn` con `"use server"`, validación zod, `signInWithPassword`, escritura de `pfa_at` y `pfa_rt` con los flags de §8, y `signOut`.
 - `src/app/login/page.tsx` — conecta el formulario a `signIn` con `useActionState` y muestra el `message` del `Result`.
-- `proxy.ts` — ahora valida el token con Supabase, refresca cuando puede, escribe `x-user-id`, y ante error de red trata la petición como no autenticada.
+- `src/proxy.ts` — ahora valida el token con Supabase, refresca cuando puede, escribe `x-user-id`, y ante error de red trata la petición como no autenticada.
 - `tests/unit/guard.test.ts` — cuatro casos del bypass (activo; sin `E2E_USER_ID`; base que no termina en `_test`; `E2E_DATABASE_URL` distinta) y uno de `requireUser()` con un `x-user-id` distinto de `APP_USER_ID` → `forbidden`.
 
 **Done when**
@@ -2100,6 +2100,7 @@ Ningún comando los decide. Se ejecutan una vez, al cierre del build, antes de c
 | **Decision: hold `typescript` en `~6.0.3`, no bump a 7.x** | Mover el track default a TypeScript 7.0.2 (ya estable, ya no exige `experimental.useTypeScriptCli` en Next 16.3+) | Why: registry drift, verificado 2026-08-28 — TS 7.0.2 es genuinamente `latest` estable, pero la propia documentación de Next lo sigue llamando "experimental… no recomendado para producción". Would reverse if: Next retira esa advertencia o el modo CLI de TS7 sale de experimental |
 | **Decision: hold `postgres` (Docker) en `17-alpine`, no bump a `18-alpine`** | Mover a `18-alpine`, ya publicada y mantenida | Why: registry drift, verificado 2026-08-28 — no hay razón de compatibilidad que fuerce el salto; `17-alpine` sigue con push activo (2026-08-16). Would reverse if: `17-alpine` deja de recibir parches de seguridad, o Supabase en producción se mueve a Postgres 18 |
 | **Decision: `prisma` CLI pinneado exacto en 7.10.0, nunca `@latest`** | `pnpm add -D prisma@latest` | Why: registry drift, verificado 2026-08-28 — el dist-tag `latest` de la CLI resuelve hoy a un release candidate (`8.0.0-rc.12`) fuera de lockstep con `@prisma/client` estable; instalarlo sin pin exacto rompería el cliente generado. Would reverse if: Prisma publica 8.x estable y CLI + cliente coinciden en esa línea |
+| **Decision: `proxy.ts` vive en `src/proxy.ts`, no en la raíz del repo** | Dejarlo en la raíz como decía el blueprint original | Why: descubierto al ejecutar el paso 1 (build real) — con `--src-dir` (fijado en §10 Bootstrap), Next 16.3.3 solo detecta `proxy.ts` al mismo nivel que `app/`; en la raíz el build lo ignora en silencio (`ƒ Proxy (Middleware)` no aparece en `next build`, y `/` no redirige a `/login`, rompiendo el smoke test del paso 1). Corregido en §3, §9 (pasos 1 y 3), el epic 01 y `tasks.json` (E1-T1, E1-T3). Would reverse if: un scaffold futuro deja de usar `--src-dir` |
 
 ### 20.4 What to build next
 

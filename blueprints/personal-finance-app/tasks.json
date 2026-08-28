@@ -23,11 +23,11 @@
     "files": [
       "src/lib/env.ts",
       "src/app/login/page.tsx",
-      "proxy.ts",
+      "src/proxy.ts",
       "src/app/globals.css",
       "tests/unit/env.test.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E1-T2",
@@ -87,7 +87,7 @@
       "src/lib/auth/guard.ts",
       "src/app/login/actions.ts",
       "src/app/login/page.tsx",
-      "proxy.ts",
+      "src/proxy.ts",
       "tests/unit/guard.test.ts"
     ],
     "status": "pending"
