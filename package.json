@@ -1,13 +1,24 @@
 {
-  "name": "tmp-scaffold",
+  "name": "personal-finance-app",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "sh scripts/with-env.sh pnpm exec next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check",
-    "format": "biome format --write"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "sh scripts/with-test-env.sh pnpm exec vitest run",
+    "test:e2e": "sh scripts/with-env.sh pnpm exec playwright test",
+    "smoke": "sh scripts/smoke.sh",
+    "fixtures": "pnpm exec tsx tests/fixtures/build-fixtures.ts",
+    "db:generate": "sh scripts/with-env.sh pnpm exec prisma generate",
+    "db:migrate": "sh scripts/with-env.sh pnpm exec prisma migrate deploy",
+    "db:migrate:test": "sh scripts/with-test-env.sh pnpm exec prisma migrate deploy",
+    "db:seed": "sh scripts/with-env.sh pnpm exec tsx prisma/seed.ts",
+    "db:seed:test": "sh scripts/with-test-env.sh pnpm exec tsx prisma/seed.ts",
+    "db:studio": "sh scripts/with-env.sh pnpm exec prisma studio"
   },
   "dependencies": {
     "next": "16.3.3",
@@ -23,5 +34,8 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=24.0.0"
+  }
 }

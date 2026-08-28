@@ -1,0 +1,424 @@
+[
+  {
+    "id": "E1-T1",
+    "title": "Esqueleto, entorno y /login servido",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": [],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `pnpm install --frozen-lockfile` runs THE SYSTEM SHALL exit 0 without modifying `pnpm-lock.yaml`.",
+      "WHEN `pnpm lint` runs THE SYSTEM SHALL exit 0 with zero errors and zero warnings, including on the `@theme` block of `src/app/globals.css`.",
+      "WHEN `src/lib/env.ts` is imported with `DATABASE_URL` unset THE SYSTEM SHALL throw an error whose message contains `DATABASE_URL`.",
+      "WHEN `src/lib/env.ts` is imported with `ANTHROPIC_API_KEY` unset THE SYSTEM SHALL NOT throw.",
+      "WHEN `pnpm build && pnpm smoke` runs THE SYSTEM SHALL print `smoke ok: /login=200, / -> /login` and exit 0."
+    ],
+    "verify": [
+      "pnpm install --frozen-lockfile",
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm test tests/unit/env.test.ts",
+      "pnpm build && pnpm smoke"
+    ],
+    "checkpoint": "step-01-skeleton",
+    "files": [
+      "src/lib/env.ts",
+      "src/app/login/page.tsx",
+      "proxy.ts",
+      "src/app/globals.css",
+      "tests/unit/env.test.ts"
+    ],
+    "status": "in_progress"
+  },
+  {
+    "id": "E1-T2",
+    "title": "Esquema, migraciones, guardas append-only y semilla",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T1"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `pnpm db:migrate:test` runs against an empty database THE SYSTEM SHALL exit 0 and create every table defined in the schema.",
+      "WHEN `pnpm db:seed:test` runs twice in a row THE SYSTEM SHALL exit 0 both times and leave exactly 4 rows in `accounts` and 8 rows in `categories`.",
+      "WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.",
+      "WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.",
+      "WHEN a transaction row is inserted with `amount_cents` of 0 THE SYSTEM SHALL reject it with a check-constraint violation.",
+      "WHEN `GET /api/health` is called THE SYSTEM SHALL respond 200 with `{ ok: true }` and `data.db` equal to `reachable`."
+    ],
+    "verify": [
+      "docker compose up -d --wait",
+      "pnpm db:generate",
+      "pnpm db:migrate:test",
+      "pnpm db:seed:test && pnpm db:seed:test",
+      "pnpm typecheck",
+      "pnpm test tests/integration/schema.test.ts",
+      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"delete from transactions\"; test $? -eq 3",
+      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"update audit_log set action='x'\"; test $? -eq 3"
+    ],
+    "checkpoint": "step-02-schema",
+    "files": [
+      "prisma/schema.prisma",
+      "prisma/migrations/**",
+      "prisma/seed.ts",
+      "src/server/db/client.ts",
+      "tests/integration/schema.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T3",
+    "title": "Sesion de un solo usuario",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T2"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `E2E_USER_ID` is set, `DATABASE_URL` ends with `_test` and equals `E2E_DATABASE_URL` THE SYSTEM SHALL return that user id from `e2eBypassUserId()`.",
+      "WHEN `E2E_USER_ID` is set but `DATABASE_URL` does not end with `_test` THE SYSTEM SHALL return null from `e2eBypassUserId()`.",
+      "WHEN `E2E_USER_ID` is set but differs from `E2E_DATABASE_URL` THE SYSTEM SHALL return null from `e2eBypassUserId()`.",
+      "WHEN `requireUser()` receives an `x-user-id` header different from `APP_USER_ID` THE SYSTEM SHALL return an error with code `forbidden`.",
+      "WHEN sign-in is called with wrong credentials THE SYSTEM SHALL return code `unauthorized` with the message `Correo o contraseña incorrectos.` and set no cookie."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm test tests/unit/guard.test.ts",
+      "pnpm build && pnpm smoke"
+    ],
+    "checkpoint": "step-03-auth",
+    "files": [
+      "src/lib/auth/guard.ts",
+      "src/app/login/actions.ts",
+      "src/app/login/page.tsx",
+      "proxy.ts",
+      "tests/unit/guard.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T4",
+    "title": "Dinero, auditoria y el unico escritor del libro",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T2"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `formatCOP(123456700n)` is called THE SYSTEM SHALL return the exact string `$1.234.567`.",
+      "WHEN `formatCOP(123456789n)` is called THE SYSTEM SHALL return the exact string `$1.234.567,89`.",
+      "WHEN `formatSignedCOP(45000000n, \"out\")` is called THE SYSTEM SHALL return the exact string `−$450.000` using U+2212 as the sign.",
+      "WHEN `createManual` inserts one transaction THE SYSTEM SHALL write exactly one `audit_log` row with `action` equal to `transaction.create` in the same database transaction.",
+      "WHEN `commitPending` is called twice with the same pending id THE SYSTEM SHALL return code `conflict` on the second call and leave the `transactions` row count unchanged.",
+      "WHEN `grep` searches `src` for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/unit/money.test.ts tests/integration/commit.test.ts",
+      "grep -rln --include=*.ts -e \"transaction\\.create\" -e \"transaction\\.update\" -e \"transaction\\.updateMany\" src | grep -vx \"src/server/ledger/commit.ts\"; test $? -eq 1"
+    ],
+    "checkpoint": "step-04-ledger-core",
+    "files": [
+      "src/lib/money.ts",
+      "src/server/db/with-audit.ts",
+      "src/server/ledger/commit.ts",
+      "tests/unit/money.test.ts",
+      "tests/integration/commit.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T5",
+    "title": "Gateway de IA y extractor de texto libre",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T4"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN the free-text extractor receives `pagué el club de tiro por 100000 de mi cuenta de ahorros` with a stubbed AI client THE SYSTEM SHALL produce `amountCents` equal to `10000000` and `direction` equal to `out`.",
+      "WHEN the AI client returns a payload that fails the schema THE SYSTEM SHALL return code `extraction_failed` and write no row.",
+      "WHEN an extraction succeeds THE SYSTEM SHALL write exactly one `pending_transactions` row with `status` equal to `awaiting_review` and zero `transactions` rows.",
+      "WHEN the unit test suite runs without `ANTHROPIC_API_KEY` set THE SYSTEM SHALL exit 0, because the SDK is imported lazily and the tests inject a fake client.",
+      "WHEN `grep` searches `src` for an import of `@anthropic-ai/sdk` outside `src/server/ai/gateway.ts` THE SYSTEM SHALL find no file."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/unit/extract-free-text.test.ts tests/integration/pending.test.ts",
+      "grep -rln --include=*.ts \"@anthropic-ai/sdk\" src | grep -vx \"src/server/ai/gateway.ts\"; test $? -eq 1",
+      "grep -rn --include=*.ts -e \"claude-\" -e \"sonnet\" -e \"opus\" -e \"haiku\" src; test $? -eq 1"
+    ],
+    "checkpoint": "step-05-ai-gateway",
+    "files": [
+      "src/server/ai/gateway.ts",
+      "src/server/ingest/extract-free-text.ts",
+      "src/server/ingest/pending.ts",
+      "tests/unit/extract-free-text.test.ts",
+      "tests/integration/pending.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T6",
+    "title": "Puerto IngestChannel y webhook de Telegram",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T5"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN a POST arrives with a wrong `X-Telegram-Bot-Api-Secret-Token` header THE SYSTEM SHALL respond 401 and write zero rows to `inbound_messages`.",
+      "WHEN the same Telegram update is delivered twice THE SYSTEM SHALL respond 200 both times and leave exactly one row in `inbound_messages`.",
+      "WHEN a message arrives from a sender other than `TELEGRAM_ALLOWED_CHAT_ID` THE SYSTEM SHALL respond 200, store the row with `allowed` false, write zero `pending_transactions` rows and send no reply.",
+      "WHEN an allowed message arrives THE SYSTEM SHALL store the row with `allowed` true and return `data.accepted` true.",
+      "WHEN `grep` searches `src/server/ingest/channel.ts` for the word `telegram` in any case THE SYSTEM SHALL find no match."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/integration/telegram-webhook.test.ts",
+      "grep -ri telegram src/server/ingest/channel.ts; test $? -eq 1"
+    ],
+    "checkpoint": "step-06-telegram",
+    "files": [
+      "src/server/ingest/channel.ts",
+      "src/server/ingest/telegram.ts",
+      "src/server/telegram/client.ts",
+      "src/app/api/webhooks/telegram/route.ts",
+      "tests/integration/telegram-webhook.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E1-T7",
+    "title": "Confirmacion por chat con estado persistido",
+    "epic": "01-cimientos-e-ingesta",
+    "dependencies": ["E1-T6"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN an allowed free-text message is processed THE SYSTEM SHALL reply with exactly `Detecté: Club de tiro, $100.000, cuenta de ahorros — ¿confirmo?` on the first line and `Responde Sí o No.` on the second.",
+      "WHEN the sender replies `sí` THE SYSTEM SHALL write exactly one `transactions` row, set the pending status to `confirmed` and delete the conversation state.",
+      "WHEN the sender replies `no` THE SYSTEM SHALL set the pending status to `rejected` and write zero `transactions` rows.",
+      "WHEN the sender replies something that is neither yes nor no THE SYSTEM SHALL resend the stored `prompt_text` unchanged and leave the conversation state in place.",
+      "WHEN a conversation state older than its `expires_at` is read THE SYSTEM SHALL treat it as absent and start a new extraction.",
+      "WHEN `grep` searches `src/server/ingest/pipeline.ts` for the word `telegram` in any case THE SYSTEM SHALL find no match."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/integration/telegram-confirm.test.ts",
+      "grep -ri telegram src/server/ingest/pipeline.ts; test $? -eq 1",
+      "grep -rn \"let .*State\\|const .*Cache\" src/server/ingest/conversation.ts; test $? -eq 1"
+    ],
+    "checkpoint": "step-07-chat-confirm",
+    "files": [
+      "src/server/ingest/conversation.ts",
+      "src/server/ingest/pipeline.ts",
+      "src/server/ingest/telegram.ts",
+      "tests/integration/telegram-confirm.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T1",
+    "title": "Shell y libro de transacciones",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E1-T3", "E1-T4"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN a manual expense of 100000 pesos is submitted through the form THE SYSTEM SHALL show a row whose amount cell reads `−$100.000`.",
+      "WHEN the ledger is empty THE SYSTEM SHALL render the text `Todavía no hay movimientos.` instead of an empty table.",
+      "WHEN a row is soft-deleted THE SYSTEM SHALL remove it from the list and leave the database row present with a non-null `deleted_at`.",
+      "WHEN the ledger page is requested THE SYSTEM SHALL issue a query containing `LIMIT` and return at most 50 rows.",
+      "WHEN the page is traversed with the keyboard only THE SYSTEM SHALL reach every interactive control in visual order with a visible focus indicator.",
+      "WHEN every amount cell is inspected THE SYSTEM SHALL show a `+` or `−` prefix, so colour is never the only indicator of direction."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm test:e2e tests/e2e/ledger.spec.ts"
+    ],
+    "checkpoint": "step-08-libro-ui",
+    "files": [
+      "src/app/(app)/layout.tsx",
+      "src/app/(app)/page.tsx",
+      "src/app/(app)/actions.ts",
+      "src/components/money-cell.tsx",
+      "tests/e2e/ledger.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T2",
+    "title": "CRUD de cuentas",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E2-T1"],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN an account is created with a name that already exists THE SYSTEM SHALL return code `conflict` and create no row.",
+      "WHEN an account with transactions is archived THE SYSTEM SHALL set `archived_at` and leave every one of its transactions readable.",
+      "WHEN an account is archived THE SYSTEM SHALL stop offering it in the new-transaction account selector.",
+      "WHEN any account is created, renamed or archived THE SYSTEM SHALL write exactly one `audit_log` row for that change."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/integration/accounts.test.ts",
+      "pnpm test:e2e tests/e2e/cuentas.spec.ts"
+    ],
+    "checkpoint": "step-09-cuentas",
+    "files": [
+      "src/server/ledger/catalog.ts",
+      "src/app/(app)/cuentas/page.tsx",
+      "src/app/(app)/cuentas/actions.ts",
+      "tests/integration/accounts.test.ts",
+      "tests/e2e/cuentas.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T3",
+    "title": "Pantalla de revision",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E1-T5", "E2-T1"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN a pending row without `amount_cents` is confirmed THE SYSTEM SHALL return code `validation_failed` whose message names the missing field and write no transaction.",
+      "WHEN a pending row is confirmed twice THE SYSTEM SHALL return code `conflict` on the second call and leave the `transactions` row count unchanged.",
+      "WHEN a pending row is confirmed THE SYSTEM SHALL write one `transactions` row, set `committed_transaction_id`, and write one `audit_log` row with action `pending.confirm`.",
+      "WHEN a pending row is rejected THE SYSTEM SHALL set its status to `rejected` and write zero `transactions` rows.",
+      "WHEN the review screen renders a pending row THE SYSTEM SHALL display its `raw_input` text on the page."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/integration/review.test.ts",
+      "pnpm test:e2e tests/e2e/revision.spec.ts"
+    ],
+    "checkpoint": "step-10-revision",
+    "files": [
+      "src/app/(app)/revision/page.tsx",
+      "src/app/(app)/revision/actions.ts",
+      "src/components/pending-card.tsx",
+      "tests/integration/review.test.ts",
+      "tests/e2e/revision.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T4",
+    "title": "Almacenamiento y recibos",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E2-T3"],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN a PNG receipt is uploaded THE SYSTEM SHALL write one `documents` row and one `pending_transactions` row with `source` equal to `receipt`.",
+      "WHEN the same file is uploaded a second time THE SYSTEM SHALL return code `conflict` and create no second `pending_transactions` row.",
+      "WHEN a file with an unsupported mime type is uploaded THE SYSTEM SHALL return code `validation_failed` and store nothing.",
+      "WHEN `STORAGE_DRIVER` is `local` THE SYSTEM SHALL write the object under `STORAGE_LOCAL_DIR` and read it back byte-identical.",
+      "WHEN an upload succeeds THE SYSTEM SHALL write one `audit_log` row with action `document.upload`."
+    ],
+    "verify": [
+      "pnpm fixtures",
+      "pnpm typecheck",
+      "pnpm test tests/integration/receipts.test.ts"
+    ],
+    "checkpoint": "step-11-documentos",
+    "files": [
+      "src/server/storage/index.ts",
+      "src/server/ingest/extract-document.ts",
+      "src/app/(app)/subir/page.tsx",
+      "src/app/(app)/subir/actions.ts",
+      "tests/integration/receipts.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T5",
+    "title": "Extractos bancarios en PDF",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E2-T4"],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN a statement PDF yielding three movements is uploaded THE SYSTEM SHALL write three `pending_transactions` rows with `source` equal to `statement`.",
+      "WHEN the same statement file is uploaded again THE SYSTEM SHALL return code `conflict` and create zero new `pending_transactions` rows.",
+      "WHEN a movement in the statement has no readable date THE SYSTEM SHALL store it with a null `occurred_on` and status `awaiting_review` rather than guessing one.",
+      "WHEN two movements in one statement have identical date, description and amount THE SYSTEM SHALL keep both as separate pending rows.",
+      "WHEN a statement is uploaded through the interface THE SYSTEM SHALL list its movements on `/revision`."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm test tests/integration/statements.test.ts",
+      "pnpm test:e2e tests/e2e/subir.spec.ts"
+    ],
+    "checkpoint": "step-12-extractos",
+    "files": [
+      "src/server/ingest/extract-statement.ts",
+      "src/server/ingest/statement-batch.ts",
+      "tests/integration/statements.test.ts",
+      "tests/e2e/subir.spec.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T6",
+    "title": "Importacion del Excel historico y paridad",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E2-T5"],
+    "priority": "p1",
+    "acceptance": [
+      "WHEN the historical workbook is imported THE SYSTEM SHALL write three `transactions` rows with `source` equal to `excel_import`.",
+      "WHEN the same workbook is imported a second time THE SYSTEM SHALL leave the `transactions` row count unchanged and report the skipped rows.",
+      "WHEN a row has a non-numeric amount THE SYSTEM SHALL report that row as failed and still import the remaining rows.",
+      "WHEN `scripts/parity-check.ts` runs after a successful import THE SYSTEM SHALL exit 0 with a per-account difference of 0.",
+      "WHEN a row is imported THE SYSTEM SHALL write one `audit_log` row with action `import.excel`."
+    ],
+    "verify": [
+      "pnpm fixtures",
+      "pnpm typecheck",
+      "pnpm test tests/integration/import-excel.test.ts",
+      "sh scripts/with-test-env.sh pnpm exec tsx scripts/parity-check.ts"
+    ],
+    "checkpoint": "step-13-excel",
+    "files": [
+      "src/server/ingest/import-excel.ts",
+      "src/app/(app)/importar/page.tsx",
+      "src/app/(app)/importar/actions.ts",
+      "scripts/parity-check.ts",
+      "tests/integration/import-excel.test.ts"
+    ],
+    "status": "pending"
+  },
+  {
+    "id": "E2-T7",
+    "title": "Respaldo, restauracion y despliegue",
+    "epic": "02-interfaz-documentos-y-despliegue",
+    "dependencies": ["E2-T6"],
+    "priority": "p0",
+    "acceptance": [
+      "WHEN `sh scripts/backup.sh` runs THE SYSTEM SHALL write one new dump file into `backups/` and exit 0.",
+      "WHEN `sh scripts/restore-check.sh` runs THE SYSTEM SHALL restore the newest dump into a separate database, report an identical row count for every table, and exit 0.",
+      "WHEN `STORAGE_DRIVER` is `supabase` and `SUPABASE_SERVICE_ROLE_KEY` is absent THE SYSTEM SHALL fail with a named error instead of falling back to the local driver.",
+      "WHEN `scripts/set-telegram-webhook.ts` runs THE SYSTEM SHALL exit 0 only after `getWebhookInfo` reports the URL built from `PRODUCTION_URL`.",
+      "WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0."
+    ],
+    "verify": [
+      "pnpm typecheck",
+      "pnpm lint",
+      "sh scripts/backup.sh",
+      "sh scripts/restore-check.sh",
+      "pnpm build && pnpm smoke",
+      "pnpm test",
+      "pnpm test:e2e",
+      "grep -qF 'docker compose up -d --wait' .github/workflows/ci.yml",
+      "grep -qF 'pnpm install --frozen-lockfile' .github/workflows/ci.yml",
+      "grep -qF 'pnpm db:generate' .github/workflows/ci.yml",
+      "grep -qF 'pnpm db:migrate:test' .github/workflows/ci.yml",
+      "grep -qF 'pnpm db:seed:test' .github/workflows/ci.yml",
+      "grep -qF 'pnpm typecheck' .github/workflows/ci.yml",
+      "grep -qF 'pnpm lint' .github/workflows/ci.yml",
+      "grep -qF 'pnpm build' .github/workflows/ci.yml",
+      "grep -qF 'pnpm smoke' .github/workflows/ci.yml",
+      "grep -qF 'pnpm fixtures' .github/workflows/ci.yml",
+      "grep -qE 'pnpm test[[:space:]]*$' .github/workflows/ci.yml",
+      "grep -qF 'pnpm test:e2e' .github/workflows/ci.yml",
+      "grep -qF 'sh scripts/restore-check.sh' .github/workflows/ci.yml",
+      "grep -qF \"git tag -l 'step-*'\" .github/workflows/ci.yml"
+    ],
+    "checkpoint": "step-14-deploy",
+    "files": [
+      "scripts/backup.sh",
+      "scripts/restore-check.sh",
+      "scripts/set-telegram-webhook.ts",
+      ".github/workflows/ci.yml",
+      "src/server/storage/index.ts"
+    ],
+    "status": "pending"
+  }
+]

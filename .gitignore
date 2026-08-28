@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# --- personal-finance-app ---
+.env
+.env.local
+.env.*.local
+!.env.example
+!.claude/
+.storage/
+backups/
+src/generated/
+test-results/
+playwright-report/
