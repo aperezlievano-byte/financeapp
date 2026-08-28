@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: #2563eb;
+  --color-primary-fg: #ffffff;
+  --color-background: #ffffff;
+  --color-surface: #fafafa;
+  --color-border: #e4e4e7;
+  --color-border-input: #71717a;
+  --color-fg: #09090b;
+  --color-fg-muted: #52525b;
+  --color-destructive: #e11d48;
+  --color-success: #059669;
+  --color-income: #059669;
+  --color-expense: #e11d48;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-primary: #60a5fa;
+    --color-primary-fg: #09090b;
+    --color-background: #09090b;
+    --color-surface: #18181b;
+    --color-border: #27272a;
+    --color-fg: #fafafa;
+    --color-fg-muted: #a1a1aa;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must win over any
+       component-level animation/transition utility applied later (§7). */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above. */
+    transition-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: same as above. */
+    scroll-behavior: auto !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-fg);
 }
