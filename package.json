@@ -13,6 +13,7 @@
     "test:e2e": "sh scripts/with-env.sh pnpm exec playwright test",
     "smoke": "sh scripts/smoke.sh",
     "fixtures": "pnpm exec tsx tests/fixtures/build-fixtures.ts",
+    "postinstall": "sh scripts/with-env.sh pnpm exec prisma generate",
     "db:generate": "sh scripts/with-env.sh pnpm exec prisma generate",
     "db:migrate": "sh scripts/with-env.sh pnpm exec prisma migrate deploy",
     "db:migrate:test": "sh scripts/with-test-env.sh pnpm exec prisma migrate deploy",
