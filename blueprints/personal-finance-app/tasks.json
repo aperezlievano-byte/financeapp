@@ -85,13 +85,14 @@
     ],
     "checkpoint": "step-03-auth",
     "files": [
+      "src/lib/result.ts",
       "src/lib/auth/guard.ts",
       "src/app/login/actions.ts",
       "src/app/login/page.tsx",
       "src/proxy.ts",
       "tests/unit/guard.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T4",

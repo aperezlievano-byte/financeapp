@@ -215,6 +215,14 @@ append_only_guards` en cuyo `migration.sql` pegas el bloque SQL de guardas (chec
 que emite Prisma**: Prisma lo elige. Las guardas son lo que convierte "append-only" de convención en
 garantía de la base — sin ellas, un `DELETE` accidental borra dinero real.
 
+Instala también `pnpm add @prisma/adapter-pg@7.10.0 pg @prisma/client-runtime-utils@7.10.0` y
+`pnpm add -D @types/pg`. El tercero no es evidente y **ningún comando de este paso lo detecta** —
+solo un `pnpm build` real (recién en E1-T3) revela `Module not found:
+Can't resolve '@prisma/client-runtime-utils'`: con `output` del cliente apuntando fuera de
+`node_modules` (`src/generated/prisma`), pnpm en modo estricto no expone ahí las dependencias
+transitivas del runtime de `@prisma/client` a menos que sean dependencia directa del `package.json`
+raíz. Instálalo ahora, no esperes a que E1-T3 lo descubra.
+
 **Files**
 - `prisma.config.ts` — new, en la raíz del proyecto: Prisma 7 ya no acepta `url`/`directUrl` en
   `datasource` dentro de `schema.prisma` (error `P1012`); la conexión de la CLI vive acá vía
@@ -275,9 +283,15 @@ por eso exige **tres** condiciones simultáneas — `E2E_USER_ID` presente, `DAT
 conjunción es lo que impide que el bypass se active jamás contra la base real.
 
 **Files**
-- `src/lib/auth/guard.ts` — new: `requireUser()` y `e2eBypassUserId()`
-- `src/app/login/actions.ts` — new: acción de sign-in contra Supabase Auth
-- `src/app/login/page.tsx` — edit: conecta la acción
+- `src/lib/result.ts` — new: el sobre `Result<T>`/`ErrorCode` de §5, en un solo lugar — toda frontera
+  lo usa, sin excepciones
+- `src/lib/auth/guard.ts` — new: `requireUser()`, `resolveSession(accessToken)`,
+  `refreshSession(refreshToken)` y `e2eBypassUserId()`. También exporta `ACCESS_COOKIE`,
+  `REFRESH_COOKIE` y `SESSION_COOKIE_OPTIONS` para que `login/actions.ts` y `proxy.ts` no dupliquen
+  los nombres de cookie ni sus flags
+- `src/app/login/actions.ts` — new: `signIn` y `signOut` contra Supabase Auth
+- `src/app/login/page.tsx` — edit: pasa a Client Component (`useActionState` lo exige) y conecta la
+  acción
 - `src/proxy.ts` — edit: ahora valida el token
 - `tests/unit/guard.test.ts` — new
 
