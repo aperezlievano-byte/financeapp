@@ -29,6 +29,11 @@ test("uploads a statement through the interface and lists its movements on /revi
     .getByLabel("Archivo (PNG, JPEG o PDF, máx. 10 MB)")
     .setInputFiles(filePath);
   await page.getByRole("button", { name: "Subir" }).click();
+  // La extraccion corre en el server action antes de que revalidatePath
+  // devuelva la respuesta -- sin esperar a que la red se asiente, el goto
+  // siguiente puede llegar a /revision antes de que la escritura del
+  // pending_transaction haya terminado.
+  await page.waitForLoadState("networkidle");
 
   await page.goto("/revision");
   await expect(page.getByText("Compra e2e")).toBeVisible();
