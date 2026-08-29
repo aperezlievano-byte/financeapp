@@ -57,3 +57,17 @@ const supabaseStorageSchema = z.object({
 export function requireSupabaseStorage() {
   return parse(supabaseStorageSchema, "requireSupabaseStorage");
 }
+
+// E2E_USER_ID y E2E_DATABASE_URL nunca estan en .env.example ni en .env a
+// proposito (§10): las define solo playwright.config.ts, para que el bypass
+// de autenticacion de e2e no pueda activarse contra la base real. Por eso son
+// opcionales y su ausencia no es un error -- a diferencia de las funciones
+// require*() de arriba.
+const e2eSchema = z.object({
+  E2E_USER_ID: z.string().optional(),
+  E2E_DATABASE_URL: z.string().optional(),
+});
+
+export function readE2E() {
+  return parse(e2eSchema, "readE2E");
+}
