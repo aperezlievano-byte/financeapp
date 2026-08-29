@@ -20,6 +20,7 @@ type CreatePendingInput = {
   extraction: FreeTextExtraction;
   inboundMessageId?: string | null;
   documentId?: string | null;
+  sourceRef?: string | null;
 };
 
 export async function createPending(
@@ -34,6 +35,7 @@ export async function createPending(
       inboundMessageId: input.inboundMessageId ?? null,
       documentId: input.documentId ?? null,
       rawInput: input.rawInput,
+      sourceRef: input.sourceRef ?? null,
       extraction: input.extraction.raw as Prisma.InputJsonValue,
       confidence: input.extraction.confidence,
       occurredOn: input.extraction.occurredOn,

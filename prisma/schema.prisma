@@ -118,6 +118,7 @@ model PendingTransaction {
   direction              Direction?
   accountId              String?       @map("account_id") @db.Uuid
   categoryId             String?       @map("category_id") @db.Uuid
+  sourceRef              String?       @map("source_ref")
   committedTransactionId String?       @unique @map("committed_transaction_id") @db.Uuid
   createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   resolvedAt             DateTime?     @map("resolved_at") @db.Timestamptz(3)

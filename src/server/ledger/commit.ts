@@ -1,6 +1,14 @@
+import { Prisma } from "../../generated/prisma";
 import type { Result } from "../../lib/result";
 import { prisma } from "../db/client";
 import { withAudit } from "../db/with-audit";
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 type CreateManualInput = {
   userId: string;
@@ -137,41 +145,60 @@ export async function commitPending(
   const amountCents = pending.amountCents;
   const direction = pending.direction;
 
-  const transactionId = await withAudit(
-    {
-      actorId: userId,
-      actorKind: "user",
-      action: "pending.confirm",
-      resourceType: "transaction",
-    },
-    async (tx) => {
-      const created = await tx.transaction.create({
-        data: {
-          userId,
-          accountId,
-          categoryId: pending.categoryId,
-          occurredOn,
-          description,
-          amountCents,
-          direction,
-          source: pending.source,
+  try {
+    const transactionId = await withAudit(
+      {
+        actorId: userId,
+        actorKind: "user",
+        action: "pending.confirm",
+        resourceType: "transaction",
+      },
+      async (tx) => {
+        const created = await tx.transaction.create({
+          data: {
+            userId,
+            accountId,
+            categoryId: pending.categoryId,
+            occurredOn,
+            description,
+            amountCents,
+            direction,
+            source: pending.source,
+            // Presente solo para pendientes de extracto (paso 12): permite
+            // que la unicidad (user_id, source, source_ref) de §4 rechace la
+            // confirmacion si el mismo movimiento ya fue committeado por otro
+            // pendiente -- p.ej. al reprocesar un extracto ya confirmado en
+            // parte. manual y receipt siempre mandan null, que nunca colisiona.
+            sourceRef: pending.sourceRef,
+          },
+        });
+
+        await tx.pendingTransaction.update({
+          where: { id: pendingId },
+          data: {
+            status: "confirmed",
+            resolvedAt: new Date(),
+            committedTransactionId: created.id,
+          },
+        });
+
+        return { result: created.id, resourceId: created.id };
+      },
+    );
+
+    return { ok: true, data: { transactionId } };
+  } catch (error) {
+    if (isUniqueConstraintViolation(error)) {
+      return {
+        ok: false,
+        error: {
+          code: "conflict",
+          message: "Este movimiento ya fue confirmado por otro pendiente.",
         },
-      });
-
-      await tx.pendingTransaction.update({
-        where: { id: pendingId },
-        data: {
-          status: "confirmed",
-          resolvedAt: new Date(),
-          committedTransactionId: created.id,
-        },
-      });
-
-      return { result: created.id, resourceId: created.id };
-    },
-  );
-
-  return { ok: true, data: { transactionId } };
+      };
+    }
+    throw error;
+  }
 }
 
 // Rechaza un pendiente: nunca escribe transactions. Junto a commitPending
