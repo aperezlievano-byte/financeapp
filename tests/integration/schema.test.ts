@@ -3,13 +3,33 @@ import { GET as healthGet } from "../../src/app/api/health/route";
 import { env } from "../../src/lib/env";
 import { prisma } from "../../src/server/db/client";
 
+const SEEDED_ACCOUNT_NAMES = [
+  "cuenta de ahorros",
+  "cuenta corriente",
+  "efectivo",
+  "tarjeta de crédito",
+];
+
+const SEEDED_CATEGORY_NAMES = [
+  "mercado",
+  "servicios",
+  "transporte",
+  "salud",
+  "ocio",
+  "educación",
+  "ingresos",
+  "otros",
+];
+
 describe("schema, seed y guardas de integridad", () => {
-  it("siembra exactamente 4 cuentas y 8 categorias para el unico usuario", async () => {
+  it("siembra exactamente las 4 cuentas y 8 categorias esperadas, sin duplicarlas", async () => {
+    // Cuenta por nombre, no el total del usuario: E2-T2 crea cuentas de
+    // verdad, asi que un conteo total ya no aisla lo que sembro seed.ts.
     const accountCount = await prisma.account.count({
-      where: { userId: env.APP_USER_ID },
+      where: { userId: env.APP_USER_ID, name: { in: SEEDED_ACCOUNT_NAMES } },
     });
     const categoryCount = await prisma.category.count({
-      where: { userId: env.APP_USER_ID },
+      where: { userId: env.APP_USER_ID, name: { in: SEEDED_CATEGORY_NAMES } },
     });
 
     expect(accountCount).toBe(4);
