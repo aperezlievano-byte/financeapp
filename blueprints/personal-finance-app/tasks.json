@@ -441,6 +441,6 @@
       "tests/unit/storage.test.ts",
       ".claude/settings.json"
     ],
-    "status": "in_progress"
+    "status": "done"
   }
 ]
