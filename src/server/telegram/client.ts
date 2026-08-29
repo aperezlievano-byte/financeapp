@@ -1,7 +1,9 @@
 import { requireTelegram } from "../../lib/env";
 
 // Llamadas HTTP a la API de Telegram con fetch nativo. Nunca importado fuera
-// de src/server/telegram/** y src/server/ingest/telegram.ts.
+// de src/server/telegram/**, src/server/ingest/telegram.ts, y
+// scripts/set-telegram-webhook.ts (paso 14 -- un script de despliegue, no
+// una ruta de ingesta, pero sigue siendo el unico cliente HTTP de Telegram).
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
 
@@ -54,4 +56,39 @@ export async function downloadFile(
   const mimeType =
     response.headers.get("content-type") ?? "application/octet-stream";
   return { bytes, mimeType };
+}
+
+export async function setWebhook(
+  url: string,
+  secretToken: string,
+): Promise<void> {
+  const { TELEGRAM_BOT_TOKEN } = requireTelegram();
+
+  const response = await fetch(
+    `${TELEGRAM_API_BASE}/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url, secret_token: secretToken }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Telegram setWebhook falló: ${response.status}`);
+  }
+}
+
+export async function getWebhookInfo(): Promise<{ url: string }> {
+  const { TELEGRAM_BOT_TOKEN } = requireTelegram();
+
+  const response = await fetch(
+    `${TELEGRAM_API_BASE}/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`Telegram getWebhookInfo falló: ${response.status}`);
+  }
+
+  const body = (await response.json()) as { result: { url: string } };
+  return { url: body.result.url };
 }

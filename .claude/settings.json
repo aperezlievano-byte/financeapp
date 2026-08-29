@@ -27,6 +27,8 @@
       "Bash(pnpm test:e2e)",
       "Bash(pnpm fixtures)",
       "Bash(pnpm db:generate)",
+      "Bash(pnpm db:migrate)",
+      "Bash(pnpm db:seed)",
       "Bash(pnpm db:migrate:test)",
       "Bash(pnpm db:seed:test)",
       "Bash(pnpm audit:*)",

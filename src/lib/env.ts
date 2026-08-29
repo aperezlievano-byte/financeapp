@@ -50,6 +50,14 @@ export function requireTelegram() {
   return parse(telegramSchema, "requireTelegram");
 }
 
+const productionUrlSchema = z.object({
+  PRODUCTION_URL: z.string().min(1),
+});
+
+export function requireProductionUrl() {
+  return parse(productionUrlSchema, "requireProductionUrl");
+}
+
 const supabaseStorageSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 });
