@@ -258,8 +258,9 @@ llamada — no reimplementes esa protección aquí.
 - `src/app/(app)/revision/page.tsx` — new: espaciosa
 - `src/app/(app)/revision/actions.ts` — new: confirmar y rechazar
 - `src/components/pending-card.tsx` — new
+- `src/server/ledger/commit.ts` — retroactive: `commitPending` ahora nombra el campo faltante en el mensaje `validation_failed` (el criterio ya estaba en la Acceptance de este paso desde el principio, pero el paso 4 nunca lo había cumplido); gana `rejectPending(pendingId, userId)`, que junto a `commitPending` es el único lugar que resuelve el estado de un pendiente — ver decision log
 - `tests/integration/review.test.ts` — new
-- `tests/e2e/revision.spec.ts` — new
+- `tests/e2e/revision.spec.ts` — new. Su `psql()` lleva `-q` además de `-t -A`: sin `-q`, un `INSERT ... RETURNING` devuelve el id **más** el tag `INSERT 0 1` en otra línea, y el id capturado queda corrupto — ver decision log
 
 **Acceptance**
 

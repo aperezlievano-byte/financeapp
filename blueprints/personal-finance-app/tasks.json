@@ -290,10 +290,11 @@
       "src/app/(app)/revision/page.tsx",
       "src/app/(app)/revision/actions.ts",
       "src/components/pending-card.tsx",
+      "src/server/ledger/commit.ts",
       "tests/integration/review.test.ts",
       "tests/e2e/revision.spec.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E2-T4",
