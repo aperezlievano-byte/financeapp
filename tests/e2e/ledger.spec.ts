@@ -12,6 +12,17 @@ function psql(sql: string): string {
     .trim();
 }
 
+// El libro entero (tabs, FAB, bottom-sheet) reacciona por estado de React, a
+// diferencia del formulario siempre-visible que reemplazo -- server-rendered
+// pero inerte hasta que el bundle hidrata. page.goto() resuelve en 'load',
+// no cuando React adjunta los onClick, asi que un click inmediato despues
+// puede caer en una ventana donde el boton existe pero no hace nada todavia.
+// networkidle da margen a que termine de hidratar antes de interactuar.
+async function gotoLedger(page: import("@playwright/test").Page) {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+}
+
 // El alta es un bottom-sheet detras del FAB "+", no un formulario siempre
 // visible -- abrirlo es el primer paso de cualquier test que registre un
 // movimiento. Tipo/Cuenta/Categoria son chips (un boton por opcion), no
@@ -54,7 +65,7 @@ test.beforeEach(() => {
 test("shows the empty state for Hoy when there are no transactions", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoLedger(page);
   await expect(
     page.getByText("No hay movimientos registrados hoy."),
   ).toBeVisible();
@@ -63,7 +74,7 @@ test("shows the empty state for Hoy when there are no transactions", async ({
 test("a manual expense of 100000 pesos shows a row with the signed amount −$100.000", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoLedger(page);
   await fillManualEntry(page, "Prueba e2e", "100000");
   await page.getByRole("button", { name: "Registrar movimiento" }).click();
 
@@ -75,7 +86,7 @@ test("a manual expense of 100000 pesos shows a row with the signed amount −$10
 test("soft-deleting a row needs a second tap to confirm, then removes it from the list but keeps the database row with deleted_at set", async ({
   page,
 }) => {
-  await page.goto("/");
+  await gotoLedger(page);
   await fillManualEntry(page, "Para borrar", "5000");
   await page.getByRole("button", { name: "Registrar movimiento" }).click();
 
@@ -117,7 +128,7 @@ test("a transaction from a past month is absent from Hoy but visible in Historia
      values (gen_random_uuid(), '${APP_USER_ID}', '${accountId}', '${pastDate}', 'Del mes pasado', 3000, 'out', 'manual', 'e2e-past-month', now())`,
   );
 
-  await page.goto("/");
+  await gotoLedger(page);
   await expect(
     page.getByRole("listitem").filter({ hasText: "Del mes pasado" }),
   ).toHaveCount(0);
@@ -139,7 +150,7 @@ test("every interactive control is reachable by keyboard with a visible focus in
     `select name from categories where user_id = '${APP_USER_ID}' order by name limit 1`,
   );
 
-  await page.goto("/");
+  await gotoLedger(page);
 
   // document.activeElement en vez de locator(":focus"): el locator espera a
   // que haya un match y se cuelga si el foco pasa por un estado que no
