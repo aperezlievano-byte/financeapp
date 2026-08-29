@@ -322,7 +322,7 @@
       "src/app/(app)/subir/actions.ts",
       "tests/integration/receipts.test.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E2-T5",
