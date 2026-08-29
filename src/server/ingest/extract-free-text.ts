@@ -92,7 +92,12 @@ export async function extractFreeText(
       description: payload.description,
       amountCents,
       direction: payload.direction,
-      occurredOn: payload.occurredOn ? new Date(payload.occurredOn) : null,
+      // Un mensaje como "pagué el club de tiro" sin fecha explícita implica
+      // hoy, no "sin determinar" -- dejarlo null bloquearía la confirmación
+      // por chat en commitPending, que exige occurredOn.
+      occurredOn: payload.occurredOn
+        ? new Date(payload.occurredOn)
+        : new Date(),
       accountId: account?.id ?? null,
       categoryId: category?.id ?? null,
       confidence: payload.confidence ?? null,

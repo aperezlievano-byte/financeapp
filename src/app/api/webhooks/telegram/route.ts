@@ -1,9 +1,13 @@
+import { env } from "../../../../lib/env";
 import { prisma } from "../../../../server/db/client";
+import { processMessage } from "../../../../server/ingest/pipeline";
 import { telegramChannel } from "../../../../server/ingest/telegram";
 
-// Solo normaliza y encola: verifica la cabecera secreta, normaliza el update,
-// respeta la unicidad de inbound_messages y aplica la allowlist. Cero
-// extraccion, cero llamadas al modelo dentro de este handler.
+// Verifica la cabecera secreta, normaliza el update, respeta la unicidad de
+// inbound_messages y aplica la allowlist -- y solo entonces delega en el
+// pipeline. Cero logica de negocio propia de Telegram en este handler; la
+// llamada al modelo ocurre despues del commit de inbound_messages, para que
+// un reintento no reprocese.
 
 export async function POST(request: Request): Promise<Response> {
   const verified = await telegramChannel.verifyRequest(request);
@@ -50,6 +54,15 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!allowed) {
     return Response.json({ ok: true, data: { ignored: true } });
+  }
+
+  // El mensaje ya quedo en inbound_messages -- eso es lo que importa para
+  // Telegram. Un fallo del pipeline (config faltante, red, extraccion) no
+  // debe tumbar el webhook: Telegram reintenta sin fin ante un no-2xx.
+  try {
+    await processMessage(env.APP_USER_ID, telegramChannel, message);
+  } catch (error) {
+    console.error("processMessage falló", error);
   }
 
   return Response.json({ ok: true, data: { accepted: true } });
