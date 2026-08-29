@@ -178,7 +178,7 @@
       "src/app/api/webhooks/telegram/route.ts",
       "tests/integration/telegram-webhook.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T7",
