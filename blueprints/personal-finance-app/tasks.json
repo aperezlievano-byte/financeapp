@@ -400,11 +400,12 @@
       "WHEN `sh scripts/restore-check.sh` runs THE SYSTEM SHALL restore the newest dump into a separate database, report an identical row count for every table, and exit 0.",
       "WHEN `STORAGE_DRIVER` is `supabase` and `SUPABASE_SERVICE_ROLE_KEY` is absent THE SYSTEM SHALL fail with a named error instead of falling back to the local driver.",
       "WHEN `scripts/set-telegram-webhook.ts` runs THE SYSTEM SHALL exit 0 only after `getWebhookInfo` reports the URL built from `PRODUCTION_URL`.",
-      "WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0."
+      "WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/backup.sh`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0."
     ],
     "verify": [
       "pnpm typecheck",
       "pnpm lint",
+      "sh scripts/with-env.sh pnpm exec prisma migrate deploy",
       "sh scripts/backup.sh",
       "sh scripts/restore-check.sh",
       "pnpm build && pnpm smoke",
@@ -413,6 +414,8 @@
       "grep -qF 'docker compose up -d --wait' .github/workflows/ci.yml",
       "grep -qF 'pnpm install --frozen-lockfile' .github/workflows/ci.yml",
       "grep -qF 'pnpm db:generate' .github/workflows/ci.yml",
+      "grep -qE 'pnpm db:migrate[[:space:]]*$' .github/workflows/ci.yml",
+      "grep -qE 'pnpm db:seed[[:space:]]*$' .github/workflows/ci.yml",
       "grep -qF 'pnpm db:migrate:test' .github/workflows/ci.yml",
       "grep -qF 'pnpm db:seed:test' .github/workflows/ci.yml",
       "grep -qF 'pnpm typecheck' .github/workflows/ci.yml",
@@ -422,6 +425,7 @@
       "grep -qF 'pnpm fixtures' .github/workflows/ci.yml",
       "grep -qE 'pnpm test[[:space:]]*$' .github/workflows/ci.yml",
       "grep -qF 'pnpm test:e2e' .github/workflows/ci.yml",
+      "grep -qF 'sh scripts/backup.sh' .github/workflows/ci.yml",
       "grep -qF 'sh scripts/restore-check.sh' .github/workflows/ci.yml",
       "grep -qF \"git tag -l 'step-*'\" .github/workflows/ci.yml"
     ],
@@ -431,7 +435,11 @@
       "scripts/restore-check.sh",
       "scripts/set-telegram-webhook.ts",
       ".github/workflows/ci.yml",
-      "src/server/storage/index.ts"
+      "src/server/storage/index.ts",
+      "src/lib/env.ts",
+      "src/server/telegram/client.ts",
+      "tests/unit/storage.test.ts",
+      ".claude/settings.json"
     ],
     "status": "in_progress"
   }

@@ -431,8 +431,12 @@ producción en el disco efímero de Vercel. `set-telegram-webhook.ts` solo sale 
 - `scripts/backup.sh` — new: `pg_dump` a `backups/`
 - `scripts/restore-check.sh` — new: restaura en otra base y compara conteos
 - `scripts/set-telegram-webhook.ts` — new: registra el webhook con `PRODUCTION_URL`
-- `.github/workflows/ci.yml` — new: el mismo gate del acceptance global
+- `.github/workflows/ci.yml` — new: el mismo gate del acceptance global. Levanta Postgres con el `docker-compose.yml` del propio repo, no el bloque `services:` nativo de Actions; el primer paso es `cp .env.example .env` (ningún paso del gate necesita una credencial real). `pnpm db:migrate` + `pnpm db:seed` corren antes que `sh scripts/backup.sh`, que corre inmediatamente antes de `sh scripts/restore-check.sh` — ver decision log, sin esos tres pasos en ese orden el gate es irrecuperable en un runner limpio
 - `src/server/storage/index.ts` — edit: activa el driver `supabase`, falla nombrado si falta la llave
+- `src/lib/env.ts` — retroactive: gana `requireProductionUrl()`
+- `src/server/telegram/client.ts` — retroactive: gana `setWebhook`/`getWebhookInfo`
+- `tests/unit/storage.test.ts` — new: el driver `supabase` sin la llave falla nombrado, nunca cae al local
+- `.claude/settings.json` — retroactive: `pnpm db:migrate`/`pnpm db:seed` (dev, sin `:test`) entran al allowlist — ver decision log
 
 **Acceptance**
 
@@ -440,13 +444,14 @@ producción en el disco efímero de Vercel. `set-telegram-webhook.ts` solo sale 
 2. WHEN `sh scripts/restore-check.sh` runs THE SYSTEM SHALL restore the newest dump into a separate database, report an identical row count for every table, and exit 0.
 3. WHEN `STORAGE_DRIVER` is `supabase` and `SUPABASE_SERVICE_ROLE_KEY` is absent THE SYSTEM SHALL fail with a named error instead of falling back to the local driver.
 4. WHEN `scripts/set-telegram-webhook.ts` runs THE SYSTEM SHALL exit 0 only after `getWebhookInfo` reports the URL built from `PRODUCTION_URL`.
-5. WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0.
+5. WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/backup.sh`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0.
 
 **Verify**
 
 ```bash
 pnpm typecheck
 pnpm lint
+sh scripts/with-env.sh pnpm exec prisma migrate deploy
 sh scripts/backup.sh
 sh scripts/restore-check.sh
 pnpm build && pnpm smoke
@@ -455,6 +460,8 @@ pnpm test:e2e
 grep -qF 'docker compose up -d --wait' .github/workflows/ci.yml
 grep -qF 'pnpm install --frozen-lockfile' .github/workflows/ci.yml
 grep -qF 'pnpm db:generate' .github/workflows/ci.yml
+grep -qE 'pnpm db:migrate[[:space:]]*$' .github/workflows/ci.yml
+grep -qE 'pnpm db:seed[[:space:]]*$' .github/workflows/ci.yml
 grep -qF 'pnpm db:migrate:test' .github/workflows/ci.yml
 grep -qF 'pnpm db:seed:test' .github/workflows/ci.yml
 grep -qF 'pnpm typecheck' .github/workflows/ci.yml
@@ -464,11 +471,12 @@ grep -qF 'pnpm smoke' .github/workflows/ci.yml
 grep -qF 'pnpm fixtures' .github/workflows/ci.yml
 grep -qE 'pnpm test[[:space:]]*$' .github/workflows/ci.yml
 grep -qF 'pnpm test:e2e' .github/workflows/ci.yml
+grep -qF 'sh scripts/backup.sh' .github/workflows/ci.yml
 grep -qF 'sh scripts/restore-check.sh' .github/workflows/ci.yml
 grep -qF "git tag -l 'step-*'" .github/workflows/ci.yml
 ```
 
-Las últimas catorce líneas son las que hacen verificable el criterio 5: comprueban que `ci.yml`
+Las últimas diecisiete líneas son las que hacen verificable el criterio 5: comprueban que `ci.yml`
 contenga literalmente cada comando del gate global, en vez de confiar en que alguien lo transcribió
 bien. Son `grep` sueltos y no un bucle a propósito — sin control de flujo, cada línea sale 0 por su
 cuenta y el allowlist de `.claude/settings.json` las cubre con `Bash(grep:*)`.

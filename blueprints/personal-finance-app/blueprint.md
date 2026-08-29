@@ -1258,7 +1258,7 @@ git tag step-13-excel
 - `scripts/backup.sh` — `pg_dump` de la base local a `backups/`, con nombre por marca de tiempo elegido por el script. **Nunca se escribe ese nombre a mano**: `restore-check.sh` toma el archivo más reciente del directorio.
 - `scripts/restore-check.sh` — **la restauración se prueba de verdad**: crea `personal_finance_restore_test`, restaura el dump más reciente en ella, compara el conteo de filas de cada tabla contra el original y sale 1 si alguno difiere. Al terminar elimina la base de prueba.
 - `scripts/set-telegram-webhook.ts` — llama `setWebhook` con `PRODUCTION_URL` + `/api/webhooks/telegram` y `secret_token = TELEGRAM_WEBHOOK_SECRET`, y verifica con `getWebhookInfo` que la URL registrada es la esperada.
-- `.github/workflows/ci.yml` — el gate de §20.1 completo, con un servicio Postgres, en cada push y cada PR. **Además**, un job **separado y no bloqueante** (`continue-on-error: true`) que corre `pnpm audit --prod` — es el control de auditoría de dependencias que promete §14. Va aparte a propósito: no forma parte del gate, no puede tumbar el deploy, y su salida la revisa Alejandro. Un hallazgo abre un issue, no detiene una entrega.
+- `.github/workflows/ci.yml` — el gate de §20.1 completo, con un servicio Postgres, en cada push y cada PR. Usa el propio `docker-compose.yml` del repo para levantar Postgres (`docker compose up -d --wait`), no el bloque `services:` nativo de GitHub Actions — así el mismo `DATABASE_URL`/`TEST_DATABASE_URL` de `.env.example` funciona en CI sin traducción. Un runner limpio no tiene `.env`: el primer paso del job es `cp .env.example .env`, suficiente porque ningún paso del gate necesita una credencial real (los tests inyectan un `AiClient` falso, el e2e usa el bypass de auth, `STORAGE_DRIVER=local` evita Supabase Storage). `pnpm db:migrate` y `pnpm db:seed` corren contra `DATABASE_URL` **antes** de `sh scripts/backup.sh`, que a su vez corre **inmediatamente antes** de `sh scripts/restore-check.sh` — ver la nota de §20.1 y el decision log: sin esos tres pasos en ese orden, `restore-check.sh` no tiene ningún dump que restaurar en un runner limpio y el gate completo queda irrecuperable. **Además**, un job **separado y no bloqueante** (`continue-on-error: true`) que corre `pnpm audit --prod` — es el control de auditoría de dependencias que promete §14. Va aparte a propósito: no forma parte del gate, no puede tumbar el deploy, y su salida la revisa Alejandro. Un hallazgo abre un issue, no detiene una entrega.
 - `src/server/storage/index.ts` — se completa la rama `supabase` usando `SUPABASE_SERVICE_ROLE_KEY` vía `requireSupabaseStorage()`; el driver local sigue siendo el de dev y tests.
 
 **Done when**
@@ -1266,23 +1266,26 @@ git tag step-13-excel
 - [ ] WHEN `sh scripts/restore-check.sh` runs THE SYSTEM SHALL restore the newest dump into a separate database, report an identical row count for every table, and exit 0.
 - [ ] WHEN `STORAGE_DRIVER` is `supabase` and `SUPABASE_SERVICE_ROLE_KEY` is absent THE SYSTEM SHALL fail with a named error instead of falling back to the local driver.
 - [ ] WHEN `scripts/set-telegram-webhook.ts` runs THE SYSTEM SHALL exit 0 only after `getWebhookInfo` reports the URL built from `PRODUCTION_URL`.
-- [ ] WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0.
+- [ ] WHEN the CI workflow runs THE SYSTEM SHALL execute, in order, `docker compose up -d --wait`, `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm db:migrate:test`, `pnpm db:seed:test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm smoke`, `pnpm fixtures`, `pnpm test`, `pnpm test:e2e`, `sh scripts/backup.sh`, `sh scripts/restore-check.sh`, and a check that `git tag -l 'step-*'` counts 14, and exit 0 only if every one of them exits 0.
 
 **Verify**
 ```bash
 pnpm typecheck                          # expect: exit 0
 pnpm lint                               # expect: exit 0
+sh scripts/with-env.sh pnpm exec prisma migrate deploy   # expect: exit 0 -- db:migrate, para que backup.sh no dumpee una base sin migrar
 sh scripts/backup.sh                    # expect: exit 0, un archivo nuevo en backups/
 sh scripts/restore-check.sh             # expect: exit 0, conteos identicos
 pnpm build && pnpm smoke                # expect: exit 0
 pnpm test                               # expect: exit 0, 0 failed, 0 skipped
 pnpm test:e2e                           # expect: exit 0, 0 failed
-# Las catorce lineas siguientes hacen verificable el criterio 5: comprueban que ci.yml
+# Las diecisiete lineas siguientes hacen verificable el criterio 5: comprueban que ci.yml
 # contenga literalmente cada comando del gate global de §20.1. Son grep sueltos y no un
 # bucle a proposito: sin control de flujo, cada linea sale 0 por su cuenta.
 grep -qF 'docker compose up -d --wait' .github/workflows/ci.yml
 grep -qF 'pnpm install --frozen-lockfile' .github/workflows/ci.yml
 grep -qF 'pnpm db:generate' .github/workflows/ci.yml
+grep -qE 'pnpm db:migrate[[:space:]]*$' .github/workflows/ci.yml
+grep -qE 'pnpm db:seed[[:space:]]*$' .github/workflows/ci.yml
 grep -qF 'pnpm db:migrate:test' .github/workflows/ci.yml
 grep -qF 'pnpm db:seed:test' .github/workflows/ci.yml
 grep -qF 'pnpm typecheck' .github/workflows/ci.yml
@@ -1292,6 +1295,7 @@ grep -qF 'pnpm smoke' .github/workflows/ci.yml
 grep -qF 'pnpm fixtures' .github/workflows/ci.yml
 grep -qE 'pnpm test[[:space:]]*$' .github/workflows/ci.yml
 grep -qF 'pnpm test:e2e' .github/workflows/ci.yml
+grep -qF 'sh scripts/backup.sh' .github/workflows/ci.yml
 grep -qF 'sh scripts/restore-check.sh' .github/workflows/ci.yml
 grep -qF "git tag -l 'step-*'" .github/workflows/ci.yml
 ```
@@ -1932,8 +1936,10 @@ Archivo real: `workspace/.claude/settings.json`. Pre-aprueba **todo comando que 
 en un prompt de permisos en cada gate, que es exactamente donde muere una construcción desatendida.
 
 `allow` cubre: `pnpm` (install, typecheck, lint, build, dev, smoke, test, test:e2e, fixtures,
-db:generate, db:migrate:test, db:seed:test, exec prisma/tsx/playwright), `docker compose`
-(up/down/ps/logs y `exec -T db psql`), los cuatro scripts de `scripts/`, `grep`, `test`, `curl` a
+db:generate, db:migrate, db:seed, db:migrate:test, db:seed:test, exec prisma/tsx/playwright),
+`docker compose` (up/down/ps/logs y `exec -T db psql`), los cinco scripts de `scripts/` (`smoke.sh`,
+`with-env.sh`, `with-test-env.sh`, `backup.sh`, `restore-check.sh` — `set-telegram-webhook.ts` no
+necesita su propia entrada: ya lo cubre el wildcard de `pnpm exec tsx`), `grep`, `test`, `curl` a
 localhost, y las operaciones de git que el protocolo de checkpoints necesita (`add`, `commit`, `tag`,
 `ls-files`, más las de lectura).
 
@@ -2038,6 +2044,8 @@ Lo que valida el proyecto entero. Es **exactamente** la lista que corre `.github
 docker compose up -d --wait
 pnpm install --frozen-lockfile
 pnpm db:generate
+pnpm db:migrate
+pnpm db:seed
 pnpm db:migrate:test
 pnpm db:seed:test
 pnpm typecheck
@@ -2047,6 +2055,7 @@ pnpm smoke
 pnpm fixtures
 pnpm test
 pnpm test:e2e
+sh scripts/backup.sh
 sh scripts/restore-check.sh
 test "$(git tag -l 'step-*' | wc -l | tr -d ' ')" -eq 14
 ```
@@ -2054,6 +2063,14 @@ test "$(git tag -l 'step-*' | wc -l | tr -d ' ')" -eq 14
 La última línea cuenta **un tag por paso**: 14 pasos, 14 tags. Es lo que detecta un build que avanzó
 sin dejar puntos de retorno. Si falla, los objetivos de rollback ya se perdieron y no hay forma de
 reconstruirlos salvo adivinando.
+
+`pnpm db:migrate` y `pnpm db:seed` (contra `DATABASE_URL`, no `TEST_DATABASE_URL`) corren antes que
+nada que toque la base de test, y `sh scripts/backup.sh` corre inmediatamente antes de
+`restore-check.sh` — ninguno de los dos aparecía en una versión anterior de esta lista, y sin ellos
+el gate es irrecuperable: `restore-check.sh` restaura el dump **más reciente** de `backups/`, pero
+si nada lo generó antes en la misma corrida (un runner de CI limpio nunca tiene uno, `backups/` está
+en `.gitignore`) sale 1 inmediatamente con "no hay ningún respaldo" — el gate global fallaría
+siempre, en cada corrida, sin excepción. Ver decision log.
 
 `sh scripts/restore-check.sh` está en el gate global **a propósito**: en una app que es la fuente de
 verdad del dinero, un respaldo cuya restauración nunca se ejecutó no es un respaldo.
