@@ -292,7 +292,9 @@ conjunción es lo que impide que el bypass se active jamás contra la base real.
 - `src/app/login/actions.ts` — new: `signIn` y `signOut` contra Supabase Auth
 - `src/app/login/page.tsx` — edit: pasa a Client Component (`useActionState` lo exige) y conecta la
   acción
-- `src/proxy.ts` — edit: ahora valida el token
+- `src/proxy.ts` — edit: ahora valida el token, y **antes que nada consulta `e2eBypassUserId()`** —
+  sin esa llamada la función queda escrita pero inerte, y ningún test e2e de ningún epic puede
+  autenticarse (corrección retroactiva, el hueco se vio recién al escribir el primer test e2e real)
 - `tests/unit/guard.test.ts` — new
 
 **Acceptance**

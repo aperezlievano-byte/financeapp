@@ -112,7 +112,7 @@ listed here, stop and report — it means the epic boundary is wrong.
 |---|---|---|
 | `01-cimientos-e-ingesta` | `src/lib/money.ts` → `formatCOP`, `formatSignedCOP` | Formato es-CO exacto: `$1.234.567`, y el menos es U+2212 |
 | `01-cimientos-e-ingesta` | `src/lib/auth/guard.ts` → `requireUser` | Devuelve el id del único usuario o un error con código `forbidden` |
-| `01-cimientos-e-ingesta` | `src/server/ledger/commit.ts` → `createManual`, `commitPending` | Únicos escritores de `transactions`; `commitPending` devuelve `conflict` en la segunda llamada |
+| `01-cimientos-e-ingesta` | `src/server/ledger/commit.ts` → `createManual`, `commitPending` | Únicos escritores de `transactions`; `commitPending` devuelve `conflict` en la segunda llamada. "Read-only" quiere decir no reescribir estas dos firmas — E2-T1 le agrega `softDelete` ahí mismo, porque sigue siendo el único archivo con permiso de escribir `transactions` |
 | `01-cimientos-e-ingesta` | `src/server/ingest/pending.ts` | Único escritor de `pending_transactions` |
 | `01-cimientos-e-ingesta` | `src/server/ai/gateway.ts` | Única puerta al SDK de Anthropic; la salida se valida con zod o falla cerrado |
 | `workspace/` | `playwright.config.ts`, `tests/e2e/global-setup.ts`, `tests/fixtures/build-fixtures.ts` | e2e en el puerto 3101; el global-setup migra, siembra y construye fixtures |
@@ -162,11 +162,19 @@ reemplaza la hoja de Excel. El libro es denso, con `tabular-nums` y paginado a 5
 `money-cell.tsx` es el componente que garantiza que el signo siempre esté presente además del color.
 
 **Files**
-- `src/app/(app)/layout.tsx` — new: shell, encabezado, navegación, tema
+- `src/app/(app)/layout.tsx` — new: shell, encabezado, navegación, enlace de "saltar al contenido"
+  como primer elemento enfocable (`sr-only` hasta recibir foco). Sin `ThemeToggle`: no está
+  especificado en ningún lado de este blueprint (§7 no lo describe, §3 no lista el componente,
+  ningún criterio lo exige) — inventar uno acá sería diseñar, no construir
+- `src/server/ledger/commit.ts` — edit: agrega `softDelete(transactionId, userId)`. Sigue siendo el
+  único escritor de `transactions` — un `UPDATE` directo desde `actions.ts` rompería esa invariante y
+  el `grep` de "único escritor" del epic 01
 - `src/app/(app)/page.tsx` — new: el libro, denso
-- `src/app/(app)/actions.ts` — new: alta manual y soft-delete
+- `src/app/(app)/actions.ts` — new: alta manual, delegando el borrado lógico a `commit.ts`
 - `src/components/money-cell.tsx` — new: `tabular-nums`, signo y acento no textual
-- `tests/e2e/ledger.spec.ts` — new
+- `tests/e2e/ledger.spec.ts` — new. `transactions` es append-only por trigger — ni un test puede
+  hacer `DELETE`; el reset entre tests usa `TRUNCATE`, que no dispara triggers de `DELETE` en
+  Postgres
 
 **Acceptance**
 

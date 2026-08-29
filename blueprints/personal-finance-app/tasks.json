@@ -233,10 +233,12 @@
       "src/app/(app)/layout.tsx",
       "src/app/(app)/page.tsx",
       "src/app/(app)/actions.ts",
+      "src/server/ledger/commit.ts",
+      "src/proxy.ts",
       "src/components/money-cell.tsx",
       "tests/e2e/ledger.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T2",
