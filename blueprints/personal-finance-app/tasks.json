@@ -150,7 +150,7 @@
       "tests/unit/extract-free-text.test.ts",
       "tests/integration/pending.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T6",
