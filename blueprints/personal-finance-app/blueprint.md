@@ -1669,6 +1669,8 @@ git add -A && git commit --allow-empty -m "chore: dependencias, configuracion y 
 
 **Vercel**, plan Hobby, región `iad1` (la más cercana con menor latencia a Supabase por defecto; se cambia a la región del proyecto de Supabase si difiere). Comando de build `pnpm build`, directorio de salida el que Next declara (no se sobrescribe), runtime Node 24 fijado por `.nvmrc` y por `engines`. `proxy.ts` corre en el runtime de Node — es el predeterminado desde Next 16 y **no se declara `runtime` dentro del archivo de proxy, porque lanza**.
 
+**Nota operativa descubierta en el primer deploy real:** las variables `NEXT_PUBLIC_*` (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) deben cargarse en Vercel como tipo **Config**, no **Secret** — el build falló con las dos reportadas como "invalidas o ausentes" por `env.ts` (que valida en cada page al recolectar datos de rutas) incluso con un valor ya guardado; recrearlas como Config lo resolvió. Encaja con la propia advertencia de Vercel al guardarlas como Secret ("Remove the public framework prefix... If that's safe, change the variable to Config"): Next.js necesita esos valores para inlinearlos en el bundle del cliente, y son públicos por diseño (`NEXT_PUBLIC_`), así que Config es también la elección semánticamente correcta, no solo la que funciona. Además, el formulario de edición de una variable ya guardada no persistió el nuevo valor dos veces seguidas sin error visible — borrar y crear de nuevo sí funcionó de forma confiable. Ver también el script `postinstall` en §10 (Bootstrap): sin ese hook, `pnpm build` falla antes incluso de llegar a esto porque `src/generated/prisma` no existe.
+
 ### Environments
 
 | Entorno | Rama | URL | Base de datos | Modo de terceros |
