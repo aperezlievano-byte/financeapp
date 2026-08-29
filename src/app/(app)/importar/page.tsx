@@ -11,7 +11,7 @@ export default async function ImportarPage() {
   const accounts = await listAccounts(user.data);
 
   return (
-    <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-6 py-8">
+    <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-4 py-8 sm:px-6">
       <h1 className="text-2xl font-semibold text-fg">Importar histórico</h1>
       <ImportForm accounts={accounts} />
     </div>

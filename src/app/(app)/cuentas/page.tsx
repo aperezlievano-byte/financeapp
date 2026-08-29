@@ -62,7 +62,7 @@ export default async function AccountsPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-6 py-8">
+    <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-4 py-8 sm:px-6">
       <section aria-labelledby="nueva-cuenta" className="flex flex-col gap-6">
         <h1 id="nueva-cuenta" className="text-2xl font-semibold text-fg">
           Nueva cuenta
@@ -124,7 +124,7 @@ export default async function AccountsPage() {
                   {formatCOP(balances.get(account.id) ?? 0n)}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <form action={handleRename} className="flex items-center gap-2">
                   <input type="hidden" name="accountId" value={account.id} />
                   <label htmlFor={`rename-${account.id}`} className="sr-only">
@@ -135,7 +135,7 @@ export default async function AccountsPage() {
                     name="name"
                     type="text"
                     defaultValue={account.name}
-                    className={`${INPUT_CLASS} py-1 text-sm`}
+                    className={`${INPUT_CLASS} w-40 py-1 text-sm`}
                   />
                   <button
                     type="submit"

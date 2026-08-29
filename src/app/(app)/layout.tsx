@@ -23,19 +23,22 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         Saltar al contenido
       </a>
       <header className="border-border border-b bg-surface">
-        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-6 py-3">
-          <nav aria-label="Principal" className="flex items-center gap-4">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <nav
+            aria-label="Principal"
+            className="flex items-center gap-4 overflow-x-auto"
+          >
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`text-sm font-medium text-fg-muted hover:text-fg ${FOCUS_RING}`}
+                className={`shrink-0 text-sm font-medium text-fg-muted hover:text-fg ${FOCUS_RING}`}
               >
                 {item.label}
               </Link>
             ))}
           </nav>
-          <form action={signOut}>
+          <form action={signOut} className="shrink-0">
             <button
               type="submit"
               className={`text-sm font-medium text-fg-muted hover:text-fg ${FOCUS_RING}`}

@@ -48,7 +48,7 @@ export default async function LedgerPage() {
   ]);
 
   return (
-    <div className="mx-auto flex max-w-[1120px] flex-col gap-8 px-6 py-8">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-8 px-4 py-8 sm:px-6">
       <section aria-labelledby="alta-manual" className="flex flex-col gap-6">
         <h1 id="alta-manual" className="text-2xl font-semibold text-fg">
           Nuevo movimiento
@@ -158,60 +158,67 @@ export default async function LedgerPage() {
         {transactions.length === 0 ? (
           <p className="text-sm text-fg-muted">Todavía no hay movimientos.</p>
         ) : (
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr className="border-border border-b text-left">
-                <th className="px-3 py-2 font-medium text-fg-muted">Fecha</th>
-                <th className="px-3 py-2 font-medium text-fg-muted">
-                  Descripción
-                </th>
-                <th className="px-3 py-2 font-medium text-fg-muted">Cuenta</th>
-                <th className="px-3 py-2 font-medium text-fg-muted">
-                  Categoría
-                </th>
-                <th className="px-3 py-2 text-right font-medium text-fg-muted">
-                  Monto
-                </th>
-                <th className="px-3 py-2 text-right font-medium text-fg-muted">
-                  <span className="sr-only">Acciones</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((transaction) => (
-                <tr key={transaction.id} className="h-8 border-border border-b">
-                  <td className="px-3 py-2 text-fg">
-                    {transaction.occurredOn.toLocaleDateString("es-CO")}
-                  </td>
-                  <td className="px-3 py-2 text-fg">
-                    {transaction.description}
-                  </td>
-                  <td className="px-3 py-2 text-fg-muted">
-                    {transaction.account.name}
-                  </td>
-                  <td className="px-3 py-2 text-fg-muted">
-                    {transaction.category?.name ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <MoneyCell
-                      amountCents={transaction.amountCents}
-                      direction={transaction.direction}
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <form action={handleDelete.bind(null, transaction.id)}>
-                      <button
-                        type="submit"
-                        className={`text-destructive text-sm hover:underline ${FOCUS_RING}`}
-                      >
-                        Borrar
-                      </button>
-                    </form>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-[13px]">
+              <thead>
+                <tr className="border-border border-b text-left">
+                  <th className="px-3 py-2 font-medium text-fg-muted">Fecha</th>
+                  <th className="px-3 py-2 font-medium text-fg-muted">
+                    Descripción
+                  </th>
+                  <th className="px-3 py-2 font-medium text-fg-muted">
+                    Cuenta
+                  </th>
+                  <th className="px-3 py-2 font-medium text-fg-muted">
+                    Categoría
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium text-fg-muted">
+                    Monto
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium text-fg-muted">
+                    <span className="sr-only">Acciones</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transactions.map((transaction) => (
+                  <tr
+                    key={transaction.id}
+                    className="h-8 border-border border-b"
+                  >
+                    <td className="px-3 py-2 text-fg">
+                      {transaction.occurredOn.toLocaleDateString("es-CO")}
+                    </td>
+                    <td className="px-3 py-2 text-fg">
+                      {transaction.description}
+                    </td>
+                    <td className="px-3 py-2 text-fg-muted">
+                      {transaction.account.name}
+                    </td>
+                    <td className="px-3 py-2 text-fg-muted">
+                      {transaction.category?.name ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <MoneyCell
+                        amountCents={transaction.amountCents}
+                        direction={transaction.direction}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <form action={handleDelete.bind(null, transaction.id)}>
+                        <button
+                          type="submit"
+                          className={`text-destructive text-sm hover:underline ${FOCUS_RING}`}
+                        >
+                          Borrar
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

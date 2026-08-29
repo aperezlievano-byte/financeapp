@@ -32,7 +32,7 @@ export function PendingCard({
         <p className="text-sm font-medium text-fg-muted">Mensaje original</p>
         <p className="text-fg">{pending.rawInput}</p>
       </div>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium text-fg-muted">Descripción</p>
           <p className="text-fg">{pending.description ?? "—"}</p>
