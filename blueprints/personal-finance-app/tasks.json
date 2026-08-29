@@ -387,7 +387,7 @@
       "pnpm-workspace.yaml",
       "tests/integration/import-excel.test.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E2-T7",
