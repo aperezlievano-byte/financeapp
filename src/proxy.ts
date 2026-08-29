@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   ACCESS_COOKIE,
+  e2eBypassUserId,
   REFRESH_COOKIE,
   refreshSession,
   resolveSession,
@@ -17,6 +18,16 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === "/login") {
     return NextResponse.next();
+  }
+
+  // Bypass de e2e: solo se activa con las tres condiciones que exige
+  // e2eBypassUserId() a la vez (§8, §10). Playwright las inyecta via
+  // webServer.env; ningun .env las define jamas.
+  const bypassUserId = e2eBypassUserId();
+  if (bypassUserId) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-user-id", bypassUserId);
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;

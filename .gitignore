@@ -51,3 +51,8 @@ backups/
 src/generated/
 test-results/
 playwright-report/
+# Regenerados en cada corrida por tests/fixtures/build-fixtures.ts (pnpm
+# fixtures); las fuentes que sí se commitean son build-fixtures.ts,
+# receipt-sample.png.base64 y statement-sample.pdf.
+tests/fixtures/receipt-sample.png
+tests/fixtures/historical-sample.xlsx

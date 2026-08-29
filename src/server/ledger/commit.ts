@@ -44,6 +44,43 @@ export async function createManual(
   return { ok: true, data: { transactionId } };
 }
 
+// Borrado logico: la unica escritura de deleted_at. La fila sigue existiendo
+// -- transactions es append-only por trigger, un DELETE real esta prohibido
+// en la base.
+export async function softDelete(
+  transactionId: string,
+  userId: string,
+): Promise<Result<null>> {
+  const transaction = await prisma.transaction.findUnique({
+    where: { id: transactionId },
+  });
+
+  if (!transaction || transaction.userId !== userId) {
+    return {
+      ok: false,
+      error: { code: "not_found", message: "Movimiento no encontrado." },
+    };
+  }
+
+  await withAudit(
+    {
+      actorId: userId,
+      actorKind: "user",
+      action: "transaction.soft_delete",
+      resourceType: "transaction",
+    },
+    async (tx) => {
+      await tx.transaction.update({
+        where: { id: transactionId },
+        data: { deletedAt: new Date() },
+      });
+      return { result: null, resourceId: transactionId };
+    },
+  );
+
+  return { ok: true, data: null };
+}
+
 // Confirma un pendiente: escribe transactions, marca el pendiente como
 // confirmado, y ambas cosas junto con audit_log en una sola transaccion.
 // Confirmar dos veces no crea dos transacciones -- devuelve conflict.
