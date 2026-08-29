@@ -354,7 +354,7 @@
       "tests/integration/statements.test.ts",
       "tests/e2e/subir.spec.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E2-T6",
