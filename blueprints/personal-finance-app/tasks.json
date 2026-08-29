@@ -323,7 +323,7 @@
       "src/server/ingest/pending.ts",
       "tests/integration/receipts.test.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E2-T5",
