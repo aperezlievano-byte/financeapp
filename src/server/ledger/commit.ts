@@ -106,6 +106,15 @@ export async function commitPending(
     };
   }
 
+  const missingFields: string[] = [];
+  if (pending.amountCents === null) missingFields.push("amount_cents");
+  if (pending.direction === null) missingFields.push("direction");
+  if (pending.occurredOn === null) missingFields.push("occurred_on");
+  if (pending.description === null) missingFields.push("description");
+  if (pending.accountId === null) missingFields.push("account_id");
+
+  // Repite la misma disyuncion (no solo missingFields.length) para que
+  // TypeScript pueda angostar los campos como no-nulos mas abajo.
   if (
     pending.amountCents === null ||
     pending.direction === null ||
@@ -117,7 +126,7 @@ export async function commitPending(
       ok: false,
       error: {
         code: "validation_failed",
-        message: "Faltan campos para confirmar el pendiente.",
+        message: `Faltan campos para confirmar el pendiente: ${missingFields.join(", ")}.`,
       },
     };
   }
@@ -163,4 +172,48 @@ export async function commitPending(
   );
 
   return { ok: true, data: { transactionId } };
+}
+
+// Rechaza un pendiente: nunca escribe transactions. Junto a commitPending
+// arriba, esta funcion es el unico lugar que resuelve el estado de un
+// pendiente -- pending.ts (paso 5) solo escribe la creacion inicial.
+export async function rejectPending(
+  pendingId: string,
+  userId: string,
+): Promise<Result<null>> {
+  const pending = await prisma.pendingTransaction.findUnique({
+    where: { id: pendingId },
+  });
+
+  if (!pending || pending.userId !== userId) {
+    return {
+      ok: false,
+      error: { code: "not_found", message: "Pendiente no encontrado." },
+    };
+  }
+
+  if (pending.status !== "awaiting_review") {
+    return {
+      ok: false,
+      error: { code: "conflict", message: "Este pendiente ya fue resuelto." },
+    };
+  }
+
+  await withAudit(
+    {
+      actorId: userId,
+      actorKind: "user",
+      action: "pending.reject",
+      resourceType: "pending_transaction",
+    },
+    async (tx) => {
+      await tx.pendingTransaction.update({
+        where: { id: pendingId },
+        data: { status: "rejected", resolvedAt: new Date() },
+      });
+      return { result: null, resourceId: pendingId };
+    },
+  );
+
+  return { ok: true, data: null };
 }
