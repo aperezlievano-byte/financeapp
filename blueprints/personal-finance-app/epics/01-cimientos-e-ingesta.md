@@ -216,18 +216,24 @@ que emite Prisma**: Prisma lo elige. Las guardas son lo que convierte "append-on
 garantía de la base — sin ellas, un `DELETE` accidental borra dinero real.
 
 **Files**
-- `prisma/schema.prisma` — new
+- `prisma.config.ts` — new, en la raíz del proyecto: Prisma 7 ya no acepta `url`/`directUrl` en
+  `datasource` dentro de `schema.prisma` (error `P1012`); la conexión de la CLI vive acá vía
+  `defineConfig({ datasource: { url: env("DIRECT_DATABASE_URL") }, migrations: { path:
+  "prisma/migrations", seed: "tsx prisma/seed.ts" } })`, importado de `"prisma/config"`
+- `prisma/schema.prisma` — new, con `datasource db { provider = "postgresql" }` sin `url` ni `directUrl`
 - `prisma/migrations/**` — new: generado por Prisma; una migración aplicada NUNCA se edita
 - `prisma/seed.ts` — new: 4 cuentas y 8 categorías, idempotente
-- `src/server/db/client.ts` — new: único lugar que abre conexión
+- `src/server/db/client.ts` — new: único lugar que abre conexión. Prisma 7 exige un driver adapter
+  explícito (`new PrismaClient()` vacío no conecta): construye `new PrismaPg(env.DATABASE_URL)` de
+  `@prisma/adapter-pg` y lo pasa como `new PrismaClient({ adapter })`
 - `tests/integration/schema.test.ts` — new
 
 **Acceptance**
 
 1. WHEN `pnpm db:migrate:test` runs against an empty database THE SYSTEM SHALL exit 0 and create every table defined in the schema.
 2. WHEN `pnpm db:seed:test` runs twice in a row THE SYSTEM SHALL exit 0 both times and leave exactly 4 rows in `accounts` and 8 rows in `categories`.
-3. WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.
-4. WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.
+3. WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.
+4. WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.
 5. WHEN a transaction row is inserted with `amount_cents` of 0 THE SYSTEM SHALL reject it with a check-constraint violation.
 6. WHEN `GET /api/health` is called THE SYSTEM SHALL respond 200 with `{ ok: true }` and `data.db` equal to `reachable`.
 
@@ -240,13 +246,16 @@ pnpm db:migrate:test
 pnpm db:seed:test && pnpm db:seed:test
 pnpm typecheck
 pnpm test tests/integration/schema.test.ts
-docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c "delete from transactions"; test $? -eq 3
-docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c "update audit_log set action='x'"; test $? -eq 3
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c "delete from transactions"; test $? -eq 1
+docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c "update audit_log set action='x'"; test $? -eq 1
 ```
 
 Las dos últimas líneas están envueltas a propósito: el éxito de la guarda **es** un error de SQL, así
-que `test $? -eq 3` hace que la línea salga 0 cuando la guarda funciona. No las "limpies" quitando
-el envoltorio — sin él, el gate queda rojo para siempre.
+que `test $? -eq 1` hace que la línea salga 0 cuando la guarda funciona. **No es `-eq 3`** aunque ese
+sea el código que la documentación de psql promete para "error de script bajo `ON_ERROR_STOP`": esa
+semántica es de `-f` (archivo de script); `-c` (comando inline, el que usa esta línea) cae en el mismo
+código 1 que cualquier error fatal de psql. Confirmado corriendo ambas formas contra Postgres 17. No
+las "limpies" quitando el envoltorio — sin él, el gate queda rojo para siempre.
 
 **Checkpoint**
 

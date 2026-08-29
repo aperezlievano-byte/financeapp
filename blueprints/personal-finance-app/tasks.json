@@ -38,8 +38,8 @@
     "acceptance": [
       "WHEN `pnpm db:migrate:test` runs against an empty database THE SYSTEM SHALL exit 0 and create every table defined in the schema.",
       "WHEN `pnpm db:seed:test` runs twice in a row THE SYSTEM SHALL exit 0 both times and leave exactly 4 rows in `accounts` and 8 rows in `categories`.",
-      "WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.",
-      "WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.",
+      "WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.",
+      "WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.",
       "WHEN a transaction row is inserted with `amount_cents` of 0 THE SYSTEM SHALL reject it with a check-constraint violation.",
       "WHEN `GET /api/health` is called THE SYSTEM SHALL respond 200 with `{ ok: true }` and `data.db` equal to `reachable`."
     ],
@@ -50,18 +50,19 @@
       "pnpm db:seed:test && pnpm db:seed:test",
       "pnpm typecheck",
       "pnpm test tests/integration/schema.test.ts",
-      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"delete from transactions\"; test $? -eq 3",
-      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"update audit_log set action='x'\"; test $? -eq 3"
+      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"delete from transactions\"; test $? -eq 1",
+      "docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test -c \"update audit_log set action='x'\"; test $? -eq 1"
     ],
     "checkpoint": "step-02-schema",
     "files": [
+      "prisma.config.ts",
       "prisma/schema.prisma",
       "prisma/migrations/**",
       "prisma/seed.ts",
       "src/server/db/client.ts",
       "tests/integration/schema.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E1-T3",

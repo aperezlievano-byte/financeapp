@@ -174,6 +174,7 @@ personal-finance-app/                # raíz — el bundle vive DENTRO de ella
   docker-compose.yml                 # Postgres local en el puerto 5433 del host
   next.config.ts · postcss.config.mjs · package.json · tsconfig.json
   playwright.config.ts               # e2e en el puerto 3101, testIgnore de blueprints/
+  prisma.config.ts                   # datasource de la CLI de Prisma 7 — paso 2
   vitest.config.ts                   # unit + integration, exclude de blueprints/
   CLAUDE.md · AGENTS.md
 ```
@@ -825,12 +826,13 @@ git ls-files --error-unmatch src/lib/env.ts   # expect: exit 0 — ya commiteado
 #### Step 2 — Esquema, migraciones, guardas y semilla
 
 **Do**
-- `prisma/schema.prisma` — el esquema completo de §4, literal.
+- `prisma.config.ts` — new, en la raíz del proyecto (no dentro de `prisma/`). **Prisma 7 ya no acepta `url`/`directUrl` dentro de `datasource` en `schema.prisma`**: la CLI (`migrate`, `generate`) toma la conexión de este archivo vía `defineConfig({ datasource: { url: env("DIRECT_DATABASE_URL") }, migrations: { path: "prisma/migrations", seed: "tsx prisma/seed.ts" } })`, importado de `"prisma/config"`. No carga `.env` por su cuenta — igual que Prisma mismo, depende de que el llamador ya haya pasado por `scripts/with-env.sh`.
+- `prisma/schema.prisma` — el esquema completo de §4, con el bloque `datasource` reducido a `{ provider = "postgresql" }` (sin `url` ni `directUrl`, que viven en `prisma.config.ts`).
 - La migración inicial: `sh scripts/with-env.sh pnpm exec prisma migrate dev --name initial_schema`. **No escribas el nombre del directorio que emite**; Prisma lo elige.
 - La migración de guardas: `sh scripts/with-env.sh pnpm exec prisma migrate dev --create-only --name append_only_guards`, y dentro del `migration.sql` que ese comando emitió, el bloque SQL de §4 tal cual (checks, `forbid_mutation`, `transactions_guard`, los tres triggers).
 
   **Ambos van por `scripts/with-env.sh`**, como todo comando que invoque Prisma, tsx o Vitest: no cargan `.env` por su cuenta, y sin él fallan de inmediato con `Environment variable not found: DATABASE_URL`. Ver §10 y `CLAUDE.md`.
-- `src/server/db/client.ts` — el **único** archivo que abre conexión. Reexporta el `PrismaClient` generado en `src/generated/prisma`. Es también el único archivo que nombra esa ruta: si `prisma generate` reporta que el `provider` fijado no existe en el major instalado, cambia `provider` al que el propio CLI nombre en su error y deja el mismo `output` — la ruta es el valor que §19.6 concilia, el `provider` no.
+- `src/server/db/client.ts` — el **único** archivo que abre conexión. Reexporta el `PrismaClient` generado en `src/generated/prisma`. **Prisma 7 exige un driver adapter explícito** — `new PrismaClient()` vacío no conecta — así que este archivo construye `new PrismaPg(env.DATABASE_URL)` de `@prisma/adapter-pg` (con `pg` como peer) y lo pasa como `new PrismaClient({ adapter })`. Es también el único archivo que nombra la ruta del cliente generado: si `prisma generate` reporta que el `provider` fijado no existe en el major instalado, cambia `provider` al que el propio CLI nombre en su error y deja el mismo `output` — la ruta es el valor que §19.6 concilia, el `provider` no.
 - `prisma/seed.ts` — idempotente, con las cuatro cuentas y ocho categorías de §4, `upsert` por `(userId, name)`, leyendo `APP_USER_ID` desde `src/lib/env.ts`.
 - `src/app/api/health/route.ts` — `GET`, sin `next/*`, devolviendo el sobre de §5.
 - `tests/integration/schema.test.ts` — un caso por tabla de §4 (`SELECT 1 FROM <tabla> LIMIT 1` no lanza), un caso que inserta una transacción y comprueba que el `check` rechaza `amount_cents <= 0`, y un caso que comprueba que `/api/health` devuelve `ok:true`.
@@ -838,8 +840,8 @@ git ls-files --error-unmatch src/lib/env.ts   # expect: exit 0 — ya commiteado
 **Done when**
 - [ ] WHEN `pnpm db:migrate:test` runs against an empty database THE SYSTEM SHALL exit 0 and create every table defined in the schema.
 - [ ] WHEN `pnpm db:seed:test` runs twice in a row THE SYSTEM SHALL exit 0 both times and leave exactly 4 rows in `accounts` and 8 rows in `categories`.
-- [ ] WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.
-- [ ] WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 3 under `ON_ERROR_STOP=1`.
+- [ ] WHEN a `DELETE` is issued against `transactions` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.
+- [ ] WHEN an `UPDATE` is issued against `audit_log` THE SYSTEM SHALL raise an exception and psql SHALL exit with code 1 under `ON_ERROR_STOP=1` and `-c`.
 - [ ] WHEN a transaction row is inserted with `amount_cents` of 0 THE SYSTEM SHALL reject it with a check-constraint violation.
 - [ ] WHEN `GET /api/health` is called THE SYSTEM SHALL respond 200 with `{ ok: true }` and `data.db` equal to `reachable`.
 
@@ -852,9 +854,9 @@ pnpm db:seed:test && pnpm db:seed:test         # expect: exit 0 las dos veces (i
 pnpm typecheck                                 # expect: exit 0
 pnpm test tests/integration/schema.test.ts     # expect: exit 0, 0 failed, 0 skipped
 docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test \
-  -c "delete from transactions"; test $? -eq 3 # expect: 3 = error SQL -> esta linea sale 0
+  -c "delete from transactions"; test $? -eq 1 # expect: 1 = error SQL bajo -c -> esta linea sale 0
 docker compose exec -T db psql -v ON_ERROR_STOP=1 -U postgres -d personal_finance_test \
-  -c "update audit_log set action='x'"; test $? -eq 3   # expect: 3 -> esta linea sale 0
+  -c "update audit_log set action='x'"; test $? -eq 1   # expect: 1 -> esta linea sale 0
 ```
 
 **Checkpoint**
@@ -1517,6 +1519,9 @@ writeFileSync("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
 
 const ts = JSON.parse(readFileSync("tsconfig.json", "utf8"));
 ts.exclude = [...new Set([...(ts.exclude ?? []), "node_modules", "blueprints", ".next"])];
+// El andamio fija ES2017; amount_cents es bigint en todo el diseño y los
+// literales 0n que eso implica no compilan por debajo de ES2020 (TS2737).
+ts.compilerOptions.target = "ES2020";
 writeFileSync("tsconfig.json", `${JSON.stringify(ts, null, 2)}\n`);
 MJS
 node .bootstrap-patch.mjs && rm -f .bootstrap-patch.mjs
@@ -1596,6 +1601,8 @@ git add -A && git commit --allow-empty -m "chore: dependencias, configuracion y 
 | `react` / `react-dom` | 19.2.8 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm create next-app` | UI; `useActionState` es de React 19. Sin cambio: ya era la versión estable actual |
 | `@supabase/supabase-js` | 2.112.4 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm add` | Auth y Storage. Único cliente de identidad |
 | `@prisma/client` | 7.10.0 | `stack-researcher`, registro npm en vivo (fila `prisma`) | 2026-08-28 | §10 Bootstrap — `pnpm add` | Cliente generado. Verificado de forma independiente contra la CLI: coinciden en la línea estable 7.10.0. **`prisma@latest` en npm resuelve hoy a un release candidate (8.0.0-rc.12) fuera de ese lockstep — nunca instalar sin pin exacto** |
+| `@prisma/adapter-pg` | 7.10.0 | resuelto por el lockfile al ejecutar el paso 2 — **no verificado contra registro por `stack-researcher`** | 2026-08-29 | **paso 2** — `pnpm add @prisma/adapter-pg@7.10.0 pg` | Driver adapter que Prisma 7 exige de forma obligatoria: `new PrismaClient()` sin adapter no conecta (§20.3) |
+| `pg` | 8.23.0 | resuelto por el lockfile al ejecutar el paso 2 — **no verificado contra registro por `stack-researcher`** | 2026-08-29 | **paso 2** — junto con `@prisma/adapter-pg` | Cliente Postgres que consume el adapter. `@types/pg` va en Development |
 | `zod` | 4.4.3 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm add` | Validación en cada frontera: env, acciones, webhook, respuestas del modelo. Sin cambio |
 | `@anthropic-ai/sdk` | 0.122.0 | `stack-researcher`, registro npm en vivo | 2026-08-28 | **paso 5** — `pnpm add @anthropic-ai/sdk@0.122.0` | Extracción. Importado en un solo archivo, y de forma diferida. **0.x: un salto de minor (0.115→0.122) puede romper el contrato de API igual que un major; no se revisó el changelog línea por línea, así que confirma manualmente antes de confiar en el bump** |
 | `exceljs` | 4.4.0 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm add exceljs@4.4.0` | Lee el `.xlsx` histórico (paso 13) y construye el fixture (`tests/fixtures/build-fixtures.ts`). **STALE**: sin release desde 2023-10-19 (~34 meses); aceptado deliberadamente por bajo radio de impacto (un solo consumidor, paso único de importación), no por descuido |
@@ -1615,6 +1622,7 @@ git add -A && git commit --allow-empty -m "chore: dependencias, configuracion y 
 | `tsx` | 4.23.12 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm add -D` | Ejecuta todo script suelto: seed, fixtures, paridad, webhook |
 | `@types/react` / `@types/react-dom` | 19.2.18 / 19.2.5 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm add -D` | Tipos |
 | `@types/node` | **UNVERIFIED — lo instala el andamio** | `create-next-app` lo elige | — | §10 Bootstrap — `pnpm create next-app` | Tipos de Node |
+| `@types/pg` | 8.23.1 | resuelto por el lockfile al ejecutar el paso 2 — **no verificado contra registro por `stack-researcher`** | 2026-08-29 | **paso 2** — `pnpm add -D @types/pg` | Tipos de `pg`, que consume el driver adapter de Prisma |
 | `shadcn` (CLI) | 4.19.0 | `stack-researcher`, registro npm en vivo | 2026-08-28 | §10 Bootstrap — `pnpm dlx shadcn@4` | Copia componentes. **No es una dependencia**. El comando de instalación fija solo el major (`shadcn@4`) y sigue siendo correcto |
 | Node.js | 24.20.0 | `stack-researcher`, nodejs.org/dist en vivo | 2026-08-28 | el desarrollador — §10 Prerequisites | Runtime. Sigue siendo la línea LTS actual ("Krypton") |
 | pnpm | 11.24.0 | `stack-researcher`, registro npm en vivo | 2026-08-28 | el desarrollador — `corepack enable --install-directory "$HOME/.local/bin"` (§10 Prerequisites); la versión la fija el campo `packageManager` de `package.json`, que corepack resuelve solo | Gestor de paquetes |
@@ -2101,6 +2109,9 @@ Ningún comando los decide. Se ejecutan una vez, al cierre del build, antes de c
 | **Decision: hold `postgres` (Docker) en `17-alpine`, no bump a `18-alpine`** | Mover a `18-alpine`, ya publicada y mantenida | Why: registry drift, verificado 2026-08-28 — no hay razón de compatibilidad que fuerce el salto; `17-alpine` sigue con push activo (2026-08-16). Would reverse if: `17-alpine` deja de recibir parches de seguridad, o Supabase en producción se mueve a Postgres 18 |
 | **Decision: `prisma` CLI pinneado exacto en 7.10.0, nunca `@latest`** | `pnpm add -D prisma@latest` | Why: registry drift, verificado 2026-08-28 — el dist-tag `latest` de la CLI resuelve hoy a un release candidate (`8.0.0-rc.12`) fuera de lockstep con `@prisma/client` estable; instalarlo sin pin exacto rompería el cliente generado. Would reverse if: Prisma publica 8.x estable y CLI + cliente coinciden en esa línea |
 | **Decision: `proxy.ts` vive en `src/proxy.ts`, no en la raíz del repo** | Dejarlo en la raíz como decía el blueprint original | Why: descubierto al ejecutar el paso 1 (build real) — con `--src-dir` (fijado en §10 Bootstrap), Next 16.3.3 solo detecta `proxy.ts` al mismo nivel que `app/`; en la raíz el build lo ignora en silencio (`ƒ Proxy (Middleware)` no aparece en `next build`, y `/` no redirige a `/login`, rompiendo el smoke test del paso 1). Corregido en §3, §9 (pasos 1 y 3), el epic 01 y `tasks.json` (E1-T1, E1-T3). Would reverse if: un scaffold futuro deja de usar `--src-dir` |
+| **Decision: `prisma.config.ts` nuevo en la raíz; `schema.prisma` sin `url`/`directUrl`; `src/server/db/client.ts` usa `@prisma/adapter-pg` + `pg`** | Mantener `url`/`directUrl` inline en `datasource` como en la plantilla original de §4, y `new PrismaClient()` sin adapter | Why: descubierto al ejecutar el paso 2 (build real) — Prisma 7 (ya pinneado en §11 antes de este refresh) rechaza `url`/`directUrl` en `schema.prisma` (`P1012`) y `new PrismaClient()` vacío no conecta: exige un driver adapter explícito. No es un efecto del bump de versiones — Prisma 7.x completo tiene este requisito. Corregido en §9 paso 2, el epic 01 y `tasks.json` (E1-T2, `files` gana `prisma.config.ts`). `@prisma/adapter-pg` y `pg` van a §11 como pines nuevos, versión 7.10.0 y 8.23.0 respectivamente (resueltas por el lockfile en esta sesión, no verificadas contra registro por `stack-researcher`). Would reverse if: una versión futura de Prisma 7 vuelve a aceptar conexión inline sin adapter |
+| **Decision: el guard check de §9 paso 2 espera `test $? -eq 1`, no `eq 3`, para `psql -c ... -v ON_ERROR_STOP=1`** | Dejar `eq 3` como decía el blueprint original | Why: descubierto al ejecutar el paso 2 contra Postgres 17 real — el código de salida 3 de psql ("error de script bajo `ON_ERROR_STOP`") solo aplica al modo `-f` (archivo); en modo `-c` (comando inline, el que usan estas dos líneas) un error SQL cae en el código 1 genérico. Confirmado corriendo ambas formas. Sin esta corrección el gate del paso 2 queda rojo para siempre pase lo que pase. Corregido en §9 paso 2, el epic 01 y `tasks.json` (E1-T2, acceptance + verify). Would reverse if: se cambia a `-f`/stdin en vez de `-c`, donde sí aplica el código 3 |
+| **Decision: `tsconfig.json` sube `target` de `ES2017` a `ES2020`** | Dejar el `ES2017` que trae el andamio de `create-next-app` | Why: descubierto al ejecutar el paso 2 (build real) — `amount_cents` es `bigint` en todo el diseño (§4, §7) y los literales `0n` que eso implica no compilan bajo `ES2017` (`tsc` los rechaza con `TS2737`). El bump es puramente del type-checker: Next/SWC ya compilaba sintaxis moderna sin mirar este campo. Afecta a todo paso que escriba un literal `bigint`, no solo al 2. Would reverse if: el diseño deja de usar `bigint` para dinero |
 
 ### 20.4 What to build next
 
