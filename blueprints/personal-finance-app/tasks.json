@@ -265,7 +265,7 @@
       "tests/integration/accounts.test.ts",
       "tests/e2e/cuentas.spec.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T3",
