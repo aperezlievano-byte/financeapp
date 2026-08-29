@@ -121,7 +121,7 @@
       "tests/unit/money.test.ts",
       "tests/integration/commit.test.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E1-T5",
