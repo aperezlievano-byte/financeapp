@@ -12,20 +12,31 @@ function psql(sql: string): string {
     .trim();
 }
 
+// El alta es un bottom-sheet detras del FAB "+", no un formulario siempre
+// visible -- abrirlo es el primer paso de cualquier test que registre un
+// movimiento. Tipo/Cuenta/Categoria son chips (un boton por opcion), no
+// <select>, asi que se seleccionan por click en el texto de la opcion.
+async function openNewTransactionForm(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Nuevo movimiento" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+}
+
 async function fillManualEntry(
   page: import("@playwright/test").Page,
   description: string,
   amountPesos: string,
 ) {
+  await openNewTransactionForm(page);
+  await page.getByRole("button", { name: "Gasto" }).click();
   await page.getByLabel("Descripción").fill(description);
   await page.getByLabel("Monto (pesos)").fill(amountPesos);
-  await page.getByLabel("Tipo").selectOption("out");
-  const accountSelect = page.getByLabel("Cuenta");
-  const firstValue = await accountSelect
-    .locator("option")
-    .first()
-    .getAttribute("value");
-  await accountSelect.selectOption(firstValue ?? "");
+  const accountName = psql(
+    `select name from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
+  );
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: accountName, exact: true })
+    .click();
   await page.getByLabel("Fecha").fill(new Date().toISOString().slice(0, 10));
 }
 
@@ -40,11 +51,13 @@ test.beforeEach(() => {
   );
 });
 
-test("shows the empty state when there are no transactions", async ({
+test("shows the empty state for Hoy when there are no transactions", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByText("Todavía no hay movimientos.")).toBeVisible();
+  await expect(
+    page.getByText("No hay movimientos registrados hoy."),
+  ).toBeVisible();
 });
 
 test("a manual expense of 100000 pesos shows a row with the signed amount −$100.000", async ({
@@ -52,25 +65,29 @@ test("a manual expense of 100000 pesos shows a row with the signed amount −$10
 }) => {
   await page.goto("/");
   await fillManualEntry(page, "Prueba e2e", "100000");
-  await page.getByRole("button", { name: "Agregar" }).click();
+  await page.getByRole("button", { name: "Registrar movimiento" }).click();
 
-  const row = page.getByRole("row", { name: /Prueba e2e/ });
+  const row = page.getByRole("listitem").filter({ hasText: "Prueba e2e" });
   await expect(row).toBeVisible();
   await expect(row.getByText("−$100.000")).toBeVisible();
 });
 
-test("soft-deleting a row removes it from the list but keeps the database row with deleted_at set", async ({
+test("soft-deleting a row needs a second tap to confirm, then removes it from the list but keeps the database row with deleted_at set", async ({
   page,
 }) => {
   await page.goto("/");
   await fillManualEntry(page, "Para borrar", "5000");
-  await page.getByRole("button", { name: "Agregar" }).click();
+  await page.getByRole("button", { name: "Registrar movimiento" }).click();
 
-  const row = page.getByRole("row", { name: /Para borrar/ });
+  const row = page.getByRole("listitem").filter({ hasText: "Para borrar" });
   await expect(row).toBeVisible();
 
-  await row.getByRole("button", { name: "Borrar" }).click();
-  await expect(page.getByRole("row", { name: /Para borrar/ })).toHaveCount(0);
+  await row.getByRole("button", { name: "Borrar movimiento" }).click();
+  await expect(row).toBeVisible(); // el primer tap solo pide confirmacion
+  await row.getByRole("button", { name: "Confirmar borrado" }).click();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Para borrar" }),
+  ).toHaveCount(0);
 
   const deletedAt = psql(
     `select deleted_at from transactions where user_id = '${APP_USER_ID}' and description = 'Para borrar'`,
@@ -78,48 +95,57 @@ test("soft-deleting a row removes it from the list but keeps the database row wi
   expect(deletedAt).not.toBe("");
 });
 
-test("returns at most 50 rows even when more exist", async ({ page }) => {
+// El libro ya no pagina a 50 filas: Historial necesita el historico completo
+// para agrupar por mes, asi que el limite se reemplazo por la separacion
+// entre pestañas -- un movimiento de un mes pasado nunca aparece en Hoy,
+// pero si aparece en Historial al elegir ese mes.
+test("a transaction from a past month is absent from Hoy but visible in Historial for that month", async ({
+  page,
+}) => {
   const accountId = psql(
     `select id from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
   );
-  const values = Array.from(
-    { length: 55 },
-    (_, i) =>
-      `(gen_random_uuid(), '${APP_USER_ID}', '${accountId}', current_date, 'seed ${i}', ${1000 + i}, 'out', 'manual', 'seed-limit-${i}', now())`,
-  ).join(",\n");
+  const pastMonth = new Date();
+  pastMonth.setMonth(pastMonth.getMonth() - 1);
+  const pastDate = new Date(pastMonth.getFullYear(), pastMonth.getMonth(), 5)
+    .toISOString()
+    .slice(0, 10);
+  const pastMonthKey = pastDate.slice(0, 7);
+
   psql(
-    `insert into transactions (id, user_id, account_id, occurred_on, description, amount_cents, direction, source, source_ref, created_at) values ${values}`,
+    `insert into transactions (id, user_id, account_id, occurred_on, description, amount_cents, direction, source, source_ref, created_at)
+     values (gen_random_uuid(), '${APP_USER_ID}', '${accountId}', '${pastDate}', 'Del mes pasado', 3000, 'out', 'manual', 'e2e-past-month', now())`,
   );
 
   await page.goto("/");
-  await expect(page.locator("tbody tr")).toHaveCount(50);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Del mes pasado" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Historial" }).click();
+  await page.getByLabel("Mes").fill(pastMonthKey);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Del mes pasado" }),
+  ).toBeVisible();
 });
 
 test("every interactive control is reachable by keyboard with a visible focus indicator", async ({
   page,
 }) => {
-  await page.goto("/");
+  const firstAccount = psql(
+    `select name from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
+  );
+  const firstCategory = psql(
+    `select name from categories where user_id = '${APP_USER_ID}' order by name limit 1`,
+  );
 
-  const expectedOrder = [
-    "Saltar al contenido",
-    "Libro",
-    "Cuentas",
-    "Revisión",
-    "Subir",
-    "Importar",
-    "Cerrar sesión",
-    "Descripción",
-    "Monto (pesos)",
-    "Tipo",
-    "Cuenta",
-    "Categoría",
-    "Fecha",
-    "Agregar",
-  ];
+  await page.goto("/");
 
   // document.activeElement en vez de locator(":focus"): el locator espera a
   // que haya un match y se cuelga si el foco pasa por un estado que no
   // matchea (por ejemplo, un segmento interno de <input type="date">).
+  // aria-label se revisa antes que textContent porque es el nombre accesible
+  // real de un boton icono como el FAB, cuyo texto visible es solo "+".
   async function focusedAccessibleText(): Promise<string> {
     return page.evaluate(() => {
       const el = document.activeElement;
@@ -128,6 +154,8 @@ test("every interactive control is reachable by keyboard with a visible focus in
         const label = el.labels?.[0]?.textContent?.trim();
         if (label) return label;
       }
+      const ariaLabel = el.getAttribute("aria-label");
+      if (ariaLabel) return ariaLabel;
       return el.textContent?.trim() ?? "";
     });
   }
@@ -141,14 +169,14 @@ test("every interactive control is reachable by keyboard with a visible focus in
     });
   }
 
-  // Un <input type="date"> nativo consume varios Tab para sus segmentos
-  // dia/mes/anio antes de dejar el control -- no asumimos un Tab por
-  // control, buscamos cada etiqueta esperada dentro de un presupuesto corto.
-  const MAX_TABS_PER_CONTROL = 4;
+  // 12, no 4: el grupo de chips de Categoria puede tener varias opciones
+  // sembradas por prisma/seed.ts entre "Sin categoría" y el boton de submit,
+  // cada una su propio tab-stop -- a diferencia de un <select>, que era un
+  // solo tab-stop sin importar cuantas <option> tuviera.
+  const MAX_TABS_PER_CONTROL = 12;
 
-  for (const expectedLabel of expectedOrder) {
+  async function expectReachable(expectedLabel: string) {
     let found = false;
-
     for (let attempt = 0; attempt < MAX_TABS_PER_CONTROL; attempt++) {
       await page.keyboard.press("Tab");
       const accessibleText = await focusedAccessibleText();
@@ -157,8 +185,46 @@ test("every interactive control is reachable by keyboard with a visible focus in
         break;
       }
     }
-
     expect(found, `no se alcanzó "${expectedLabel}" por teclado`).toBe(true);
     expect(await focusedHasVisibleRing()).toBe(true);
+  }
+
+  const topLevelOrder = [
+    "Saltar al contenido",
+    "Libro",
+    "Cuentas",
+    "Revisión",
+    "Subir",
+    "Importar",
+    "Cerrar sesión",
+    "Hoy",
+    "Historial",
+    "Resumen",
+    "Nuevo movimiento",
+  ];
+  for (const expectedLabel of topLevelOrder) {
+    await expectReachable(expectedLabel);
+  }
+
+  // El FAB recien alcanzado por Tab: Enter lo activa igual que un click.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  // El modal mueve el foco a Descripción al abrir -- no hace falta Tab hasta
+  // ahi, ya es el elemento activo.
+  expect(await focusedAccessibleText()).toContain("Descripción");
+  expect(await focusedHasVisibleRing()).toBe(true);
+
+  const modalOrder = [
+    "Monto (pesos)",
+    "Fecha",
+    firstAccount,
+    "Sin categoría",
+    firstCategory,
+    "Registrar movimiento",
+    "Cancelar",
+  ];
+  for (const expectedLabel of modalOrder) {
+    await expectReachable(expectedLabel);
   }
 });

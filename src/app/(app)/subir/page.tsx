@@ -17,7 +17,7 @@ export default async function SubirPage() {
 
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-semibold text-fg">Subir recibo</h1>
+      <h1 className="font-display font-bold text-2xl text-fg">Subir recibo</h1>
       <form action={handleUpload} className="flex flex-col gap-4">
         <label htmlFor="file" className="text-sm font-medium text-fg-muted">
           Archivo (PNG, JPEG o PDF, máx. 10 MB)

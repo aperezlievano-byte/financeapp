@@ -102,30 +102,53 @@ cargarlos sin bundler. La unica excepcion es `proxy.ts`, que no tiene tests.
 Tokens definidos una vez en `src/app/globals.css` dentro de `@theme`. Los
 componentes solo usan nombres de token.
 
-| Rol | Valor | Uso |
+**Rediseño cálido (2026-08-29):** reemplaza la paleta azul/system-font
+original a pedido explícito del usuario, inspirado en un mockup propio
+(`expense-tracker.jsx`, otra conversación de Claude). Decision registrada en
+`blueprints/personal-finance-app/blueprint.md` §20.3.
+
+| Rol | Valor (claro / oscuro) | Uso |
 |---|---|---|
-| Primary | `#2563EB` | Botones primarios, enlaces, focus ring |
-| Background (claro / oscuro) | `#FFFFFF` / `#09090B` | Fondo de pagina |
-| Foreground (claro / oscuro) | `#09090B` / `#FAFAFA` | Texto |
-| Surface (claro / oscuro) | `#FAFAFA` / `#18181B` | Tarjetas, paneles |
-| Border (claro / oscuro) | `#E4E4E7` / `#27272A` | Divisores, inputs |
-| Muted text (claro / oscuro) | `#52525B` / `#A1A1AA` | Texto secundario |
+| Primary | `#2C1810` / `#E8A87C` | Botones primarios, header, focus ring |
+| Highlight | `#E8A87C` (igual en ambos) | Pill activo, acento sobre primary |
+| Background | `#F7F3EE` / `#1C1410` | Fondo de pagina |
+| Foreground | `#2C1810` / `#F7F3EE` | Texto |
+| Surface | `#FFFFFF` / `#2C1810` | Tarjetas, paneles, filas de lista |
+| Border | `#DDD5CA` / `#4A3A2C` | Divisores, inputs |
+| Muted text | `#8A7060` / `#C9A98A` | Texto secundario |
 | Income | `#059669` | Ingresos — **siempre** con prefijo `+` |
 | Expense | `#E11D48` | Gastos — **siempre** con prefijo `−` (U+2212) |
 | Destructive | `#E11D48` | Errores, borrar |
 
-- **Tipografia:** stack del sistema (`ui-sans-serif, system-ui, …`). Sin
-  webfont: es una decision deliberada para reducir riesgo de build.
+- **Tipografia:** `next/font/google` — Source Sans 3 (`--font-sans`, cuerpo) y
+  Playfair Display (`--font-display`, títulos y montos grandes). Autohosteado
+  por Next en build time (sin request a Google en runtime), así que no
+  reintroduce el riesgo de build que motivó el "sin webfont" original — ver
+  el comentario en `src/app/layout.tsx`. Cada token de fuente en `@theme`
+  referencia la variable que inyecta `next/font` con fallback a system-font,
+  nunca al revés, para que un fallo de carga jamás rompa el layout.
 - **Escala:** 12 / 14 / 16 / 20 / 24 / 32 px. Body 14px/1.5.
 - **Espaciado:** base 4px — 4, 8, 12, 16, 24, 32, 48. Sin valores arbitrarios.
-- **Radio:** 6px en inputs y botones, 8px en tarjetas.
-- **Elevacion:** plano — solo bordes.
+- **Radio:** `--radius` base 10px (`0.625rem`); `--radius-lg` (tarjetas,
+  bottom-sheet) 16px; `--radius-xl` 22px. Los chips y el FAB usan
+  `rounded-full`.
+- **Elevacion:** plano — solo bordes, **excepto** el FAB ("+") y el
+  bottom-sheet de alta rápida, que llevan `shadow-lg`/`shadow-*` porque son
+  overlays flotantes sobre el resto de la interfaz, no tarjetas en el flujo
+  normal. Todo lo demás (tarjetas, filas, inputs) sigue siendo solo bordes.
 - **Movimiento:** 150ms `ease-out`, solo `opacity` y `transform`. Respeta
   `prefers-reduced-motion`.
-- **Densidad:** la tabla de transacciones es densa (fila 32px, texto 13px,
-  `tabular-nums`). La pantalla de revision de pendientes y todos los
-  formularios llevan espaciado generoso: ahi se toman decisiones.
-- **Numeros:** toda celda de dinero lleva `font-variant-numeric: tabular-nums`.
+- **Densidad:** el libro (`/`) es una app de una sola columna con tabs
+  Hoy/Historial/Resumen, filas de lista (no tabla), un FAB para alta rápida y
+  el formulario en un bottom-sheet modal — ver `src/app/(app)/ledger-view.tsx`
+  y los archivos que importa. Tipo/Cuenta/Categoría son chips (`<button>`),
+  no `<select>`. La pantalla de revision de pendientes y los formularios de
+  las demas rutas mantienen espaciado generoso.
+- **Numeros:** toda celda de dinero lleva `font-variant-numeric: tabular-nums`
+  y tipografía `font-display` cuando es un monto destacado (hero, filas).
+- **Color de categoría:** derivado del nombre vía `src/lib/category-color.ts`
+  (hash determinístico sobre una paleta fija) — las categorías son filas de
+  usuario, no un enum, así que no hay una tabla de colores fija que asignar.
 
 ## Environment
 

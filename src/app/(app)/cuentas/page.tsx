@@ -64,7 +64,10 @@ export default async function AccountsPage() {
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-8 px-4 py-8 sm:px-6">
       <section aria-labelledby="nueva-cuenta" className="flex flex-col gap-6">
-        <h1 id="nueva-cuenta" className="text-2xl font-semibold text-fg">
+        <h1
+          id="nueva-cuenta"
+          className="font-display font-bold text-2xl text-fg"
+        >
           Nueva cuenta
         </h1>
         <form action={handleCreate} className="flex flex-col gap-6">
@@ -103,7 +106,7 @@ export default async function AccountsPage() {
       </section>
 
       <section aria-labelledby="cuentas" className="flex flex-col gap-4">
-        <h2 id="cuentas" className="text-xl font-semibold text-fg">
+        <h2 id="cuentas" className="font-display font-bold text-fg text-xl">
           Cuentas
         </h2>
         <ul className="flex flex-col gap-4">

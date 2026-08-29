@@ -1,17 +1,9 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOut } from "../login/actions";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Libro" },
-  { href: "/cuentas", label: "Cuentas" },
-  { href: "/revision", label: "Revisión" },
-  { href: "/subir", label: "Subir" },
-  { href: "/importar", label: "Importar" },
-];
+import { NavLinks } from "./nav-links";
 
 const FOCUS_RING =
-  "rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  "rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -24,20 +16,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </a>
       <header className="border-border border-b bg-surface">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <nav
-            aria-label="Principal"
-            className="flex items-center gap-4 overflow-x-auto"
-          >
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`shrink-0 text-sm font-medium text-fg-muted hover:text-fg ${FOCUS_RING}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <NavLinks />
           <form action={signOut} className="shrink-0">
             <button
               type="submit"
