@@ -1,0 +1,204 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountKind {
+  savings
+  checking
+  cash
+  credit_card
+}
+
+enum Direction {
+  in
+  out
+}
+
+enum Source {
+  manual
+  free_text
+  telegram
+  receipt
+  statement
+  excel_import
+}
+
+enum PendingStatus {
+  awaiting_review
+  confirmed
+  rejected
+}
+
+enum DocumentKind {
+  receipt
+  statement
+  spreadsheet
+}
+
+enum DocumentStatus {
+  uploaded
+  extracted
+  failed
+}
+
+model Account {
+  id           String               @id @default(uuid()) @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  name         String
+  kind         AccountKind
+  currency     String               @default("COP")
+  archivedAt   DateTime?            @map("archived_at") @db.Timestamptz(3)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  transactions Transaction[]
+  pending      PendingTransaction[]
+
+  @@unique([userId, name])
+  @@map("accounts")
+}
+
+model Category {
+  id           String               @id @default(uuid()) @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  name         String
+  archivedAt   DateTime?            @map("archived_at") @db.Timestamptz(3)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  transactions Transaction[]
+  pending      PendingTransaction[]
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+model Transaction {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  accountId   String    @map("account_id") @db.Uuid
+  categoryId  String?   @map("category_id") @db.Uuid
+  occurredOn  DateTime  @map("occurred_on") @db.Date
+  description String
+  amountCents BigInt    @map("amount_cents")
+  direction   Direction
+  source      Source
+  sourceRef   String?   @map("source_ref")
+  documentId  String?   @map("document_id") @db.Uuid
+  note        String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  account  Account             @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  document Document?           @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  pending  PendingTransaction?
+
+  @@unique([userId, source, sourceRef])
+  @@index([userId, occurredOn(sort: Desc)])
+  @@index([userId, accountId, occurredOn])
+  @@map("transactions")
+}
+
+model PendingTransaction {
+  id                     String        @id @default(uuid()) @db.Uuid
+  userId                 String        @map("user_id") @db.Uuid
+  status                 PendingStatus @default(awaiting_review)
+  source                 Source
+  inboundMessageId       String?       @unique @map("inbound_message_id") @db.Uuid
+  documentId             String?       @map("document_id") @db.Uuid
+  rawInput               String        @map("raw_input")
+  extraction             Json
+  confidence             Float?
+  occurredOn             DateTime?     @map("occurred_on") @db.Date
+  description            String?
+  amountCents            BigInt?       @map("amount_cents")
+  direction              Direction?
+  accountId              String?       @map("account_id") @db.Uuid
+  categoryId             String?       @map("category_id") @db.Uuid
+  committedTransactionId String?       @unique @map("committed_transaction_id") @db.Uuid
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  resolvedAt             DateTime?     @map("resolved_at") @db.Timestamptz(3)
+
+  account   Account?           @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  category  Category?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  document  Document?          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  message   InboundMessage?    @relation(fields: [inboundMessageId], references: [id], onDelete: Cascade)
+  committed Transaction?       @relation(fields: [committedTransactionId], references: [id], onDelete: Restrict)
+  state     ConversationState?
+
+  @@index([userId, status, createdAt])
+  @@map("pending_transactions")
+}
+
+model Document {
+  id           String               @id @default(uuid()) @db.Uuid
+  userId       String               @map("user_id") @db.Uuid
+  kind         DocumentKind
+  storageKey   String               @unique @map("storage_key")
+  filename     String
+  mimeType     String               @map("mime_type")
+  bytes        Int
+  sha256       String
+  status       DocumentStatus       @default(uploaded)
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  transactions Transaction[]
+  pending      PendingTransaction[]
+
+  @@unique([userId, sha256])
+  @@map("documents")
+}
+
+model InboundMessage {
+  id                String    @id @default(uuid()) @db.Uuid
+  channel           String
+  providerMessageId String    @map("provider_message_id")
+  sender            String
+  text              String?
+  attachments       Json      @default("[]")
+  receivedAt        DateTime  @map("received_at") @db.Timestamptz(3)
+  allowed           Boolean
+  processedAt       DateTime? @map("processed_at") @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  pending           PendingTransaction?
+
+  @@unique([channel, providerMessageId])
+  @@index([channel, sender, createdAt(sort: Desc)])
+  @@map("inbound_messages")
+}
+
+model ConversationState {
+  id                   String   @id @default(uuid()) @db.Uuid
+  channel              String
+  sender               String
+  awaiting             String
+  pendingTransactionId String?  @unique @map("pending_transaction_id") @db.Uuid
+  promptText           String   @map("prompt_text")
+  expiresAt            DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  pending PendingTransaction? @relation(fields: [pendingTransactionId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, sender])
+  @@map("conversation_states")
+}
+
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  actorId      String   @map("actor_id")
+  actorKind    String   @map("actor_kind")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String   @map("resource_id")
+  before       Json?
+  after        Json?
+  requestId    String?  @map("request_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([resourceType, resourceId, createdAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_log")
+}
