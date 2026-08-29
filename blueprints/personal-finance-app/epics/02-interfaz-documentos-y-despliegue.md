@@ -381,10 +381,14 @@ como fallida y **las demás igual se importan** — un archivo real siempre trae
 `parity-check.ts` es el que decide si el corte puede ocurrir.
 
 **Files**
-- `src/server/ingest/import-excel.ts` — new
+- `src/server/ingest/import-excel.ts` — new. La hoja no trae columna de cuenta (solo `fecha`, `descripcion`, `monto`): el usuario elige la cuenta destino una vez, en el formulario de `/importar` — todo el archivo entra a esa cuenta. `source_ref = sha256(fecha|descripcion|monto)`, sin componente de posición (a diferencia de `statement-batch.ts` del paso 12): es una hoja curada a mano una sola vez, no un extracto de banco con filas potencialmente idénticas por diseño.
 - `src/app/(app)/importar/page.tsx` — new
 - `src/app/(app)/importar/actions.ts` — new
-- `scripts/parity-check.ts` — new: compara el libro contra la hoja, por cuenta
+- `src/app/(app)/importar/import-form.tsx` — new: **el primer componente `"use client"` de la app.** Es el único formulario que necesita mostrar en la misma pantalla el resultado estructurado de la acción (conteo leídas/importadas/saltadas y el detalle de las que fallaron) en vez de solo revalidar y seguir — los demás formularios descartan el `Result` y dependen de `revalidatePath`. Usa `useActionState` (React 19 / Next 16); cumple la regla 4 de código (`"use client"` solo en la hoja que necesita estado).
+- `scripts/parity-check.ts` — new: compara el libro contra la hoja para **la cuenta `"cuenta de ahorros"` por nombre**, no para cualquier cuenta con filas `source='excel_import'` — ver decision log
+- `src/lib/money.ts` — retroactive: gana `pesosNumberToCents(monto: number): bigint`, para convertir el `number` que devuelve una celda de Excel (a diferencia de `pesosToCents`, que espera la cadena de dígitos que manda el modelo de IA)
+- `src/server/ledger/commit.ts` — retroactive: gana `importRow()`, el único camino que escribe `transactions` sin pasar por revisión (paso 13); atrapa la violación de unicidad `(user_id, source, source_ref)` como `conflict`
+- `pnpm-workspace.yaml` — retroactive: `overrides: '@types/node': ^20` — ver decision log
 - `tests/integration/import-excel.test.ts` — new
 
 **Acceptance**

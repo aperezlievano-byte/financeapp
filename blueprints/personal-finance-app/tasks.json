@@ -380,7 +380,11 @@
       "src/server/ingest/import-excel.ts",
       "src/app/(app)/importar/page.tsx",
       "src/app/(app)/importar/actions.ts",
+      "src/app/(app)/importar/import-form.tsx",
       "scripts/parity-check.ts",
+      "src/lib/money.ts",
+      "src/server/ledger/commit.ts",
+      "pnpm-workspace.yaml",
       "tests/integration/import-excel.test.ts"
     ],
     "status": "in_progress"
