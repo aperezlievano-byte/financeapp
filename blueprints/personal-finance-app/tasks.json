@@ -347,6 +347,10 @@
     "files": [
       "src/server/ingest/extract-statement.ts",
       "src/server/ingest/statement-batch.ts",
+      "prisma/schema.prisma",
+      "src/server/ingest/pending.ts",
+      "src/server/ledger/commit.ts",
+      "src/app/(app)/subir/actions.ts",
       "tests/integration/statements.test.ts",
       "tests/e2e/subir.spec.ts"
     ],

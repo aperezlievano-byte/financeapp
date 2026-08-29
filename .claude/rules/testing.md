@@ -19,3 +19,9 @@ paths:
 - Un test que prueba el *contrato* de una extracción usa cliente falso. La *calidad* de la extracción
   se evalúa a mano contra el modelo real, obligatoriamente, antes de cambiar un prompt o
   `ANTHROPIC_MODEL_ID`.
+- **Ningún archivo o valor que un test de integración vaya a confirmar (es decir, que vaya a escribir
+  en `transactions`) usa contenido literal fijo.** `source_ref`/dedupe keys son determinísticos por
+  diseño: una corrida suelta de `pnpm test tests/integration/<archivo>` dentro de la misma sesión dura
+  deja filas confirmadas en la base de test que sobreviven a la siguiente corrida (nada trunca
+  `transactions` entre archivos — `fileParallelism: false`), y un valor fijo vuelve a calcular la
+  misma clave y choca contra esas filas. Usa `randomUUID()` en cualquier campo que entre al hash.

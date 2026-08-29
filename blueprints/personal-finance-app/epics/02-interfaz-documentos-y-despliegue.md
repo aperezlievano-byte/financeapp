@@ -337,8 +337,12 @@ monto se conservan **ambos**, porque en un extracto real eso suele ser dos compr
 día, no un duplicado.
 
 **Files**
-- `src/server/ingest/extract-statement.ts` — new: extractor de muchos movimientos
-- `src/server/ingest/statement-batch.ts` — new: agrupa los movimientos de un extracto
+- `src/server/ingest/extract-statement.ts` — new: extractor de muchos movimientos. Gana ademas un `resolveClient()` interno que sustituye el `AiClient` por uno falso cuando `e2eBypassUserId()` esta activo — ver decision log, es lo que hace posible `tests/e2e/subir.spec.ts`.
+- `src/server/ingest/statement-batch.ts` — new: agrupa los movimientos de un extracto. `source_ref = sha256(indice|fecha|descripcion|monto|nombreArchivo)` — el indice es una correccion sobre el algoritmo tal como lo describe §9 paso 12, ver decision log.
+- `prisma/schema.prisma` — retroactive: `PendingTransaction` gana `sourceRef String? @map("source_ref")` (migracion `add_pending_source_ref`), para que `commitPending` pueda propagarlo a `transactions.source_ref` y la unicidad `(user_id, source, source_ref)` de §4 rechace confirmar el mismo movimiento dos veces
+- `src/server/ingest/pending.ts` — retroactive: `createPending` acepta `sourceRef` opcional
+- `src/server/ledger/commit.ts` — retroactive: `commitPending` manda `pending.sourceRef` al crear la `transaction`, y atrapa la violacion de unicidad (`P2002`) como `conflict` en vez de dejarla propagarse sin capturar
+- `src/app/(app)/subir/actions.ts` — retroactive: `uploadReceiptAction` rutea por `mimeType` — PDF a `processStatement`, imagen a `extractReceipt` — ver decision log
 - `tests/integration/statements.test.ts` — new
 - `tests/e2e/subir.spec.ts` — new
 
