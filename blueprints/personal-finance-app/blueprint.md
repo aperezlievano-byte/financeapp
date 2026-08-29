@@ -1160,7 +1160,7 @@ git tag step-10-revision
 
 **Do**
 - `src/server/storage/index.ts` — `putObject(key, bytes, mimeType)` y `getObject(key)`, con `STORAGE_DRIVER='local'` escribiendo bajo `STORAGE_LOCAL_DIR`. La rama `supabase` existe como stub que lanza `internal` hasta el paso 14: implementarla ahora exigiría `SUPABASE_SERVICE_ROLE_KEY`, que §10 marca como requerida desde el paso 14, y romper eso rompería los gates anteriores.
-- `src/server/ingest/extract-document.ts` — sube el archivo, calcula `sha256`, escribe `documents` (con `conflict` si el hash ya existe), y manda los bytes al gateway como adjunto para obtener **un** movimiento. Escribe el pendiente con `source='receipt'`.
+- `src/server/ingest/extract-document.ts` — sube el archivo, calcula `sha256`, escribe `documents` (con `conflict` si el hash ya existe), y manda los bytes al gateway como adjunto para obtener **un** movimiento. Escribe el pendiente con `source='receipt'`, en la misma transacción que `documents` y el `audit_log` de `document.upload` — para eso, `pending.ts` (paso 5) gana un segundo parámetro opcional con el `Prisma.TransactionClient`, sin dejar de ser el único lugar que arma el INSERT de `pending_transactions`.
 - `src/app/(app)/subir/page.tsx` y `actions.ts` — formulario de archivo, límite de 10 MB, tipos `image/png`, `image/jpeg`, `application/pdf`, con `requireUser()` y el mapeo de errores de §5.
 - `tests/integration/receipts.test.ts` — con gateway falso y `tests/fixtures/receipt-sample.png`: subir escribe una fila en `documents` y una en `pending_transactions`; subir el mismo archivo otra vez devuelve `conflict` y no crea un segundo pendiente; un `mimeType` no permitido devuelve `validation_failed`.
 

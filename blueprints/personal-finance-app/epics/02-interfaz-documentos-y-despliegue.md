@@ -299,6 +299,7 @@ Corre `pnpm fixtures` primero: escribe `receipt-sample.png` desde el base64 que 
 - `src/server/ingest/extract-document.ts` — new: extractor de un movimiento desde imagen/PDF
 - `src/app/(app)/subir/page.tsx` — new
 - `src/app/(app)/subir/actions.ts` — new
+- `src/server/ingest/pending.ts` — retroactive: `createPending` gana un segundo parámetro opcional (`db`, el `Prisma.TransactionClient` o el cliente global) para que `extract-document.ts` pueda escribir `documents` y el pendiente en la misma transacción que el `audit_log` de `document.upload`, sin dejar de ser el único lugar que arma el INSERT
 - `tests/integration/receipts.test.ts` — new
 
 **Acceptance**

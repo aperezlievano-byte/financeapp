@@ -320,6 +320,7 @@
       "src/server/ingest/extract-document.ts",
       "src/app/(app)/subir/page.tsx",
       "src/app/(app)/subir/actions.ts",
+      "src/server/ingest/pending.ts",
       "tests/integration/receipts.test.ts"
     ],
     "status": "in_progress"
