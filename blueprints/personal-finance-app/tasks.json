@@ -350,7 +350,7 @@
       "tests/integration/statements.test.ts",
       "tests/e2e/subir.spec.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E2-T6",
