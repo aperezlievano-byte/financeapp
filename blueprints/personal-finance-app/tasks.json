@@ -294,7 +294,7 @@
       "tests/integration/review.test.ts",
       "tests/e2e/revision.spec.ts"
     ],
-    "status": "in_progress"
+    "status": "done"
   },
   {
     "id": "E2-T4",
