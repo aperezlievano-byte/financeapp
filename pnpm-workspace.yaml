@@ -1,3 +1,5 @@
+overrides:
+  '@types/node': ^20
 allowBuilds:
   '@prisma/engines': true
   esbuild: true

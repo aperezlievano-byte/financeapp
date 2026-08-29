@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@types/node': ^20
+
 importers:
 
   .:
@@ -1891,9 +1894,6 @@ packages:
 
   '@types/lodash@4.17.25':
     resolution: {integrity: sha512-+K1NIO8I+F9/wNulfVvu23QYd0Pe9/OCqRrim4NoYIf1VoEDL90Ve4ClzpyqBLc7NpGGWRvYNCKZ1BE/Jpf8dQ==}
-
-  '@types/node@14.18.63':
-    resolution: {integrity: sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ==}
 
   '@types/node@20.19.43':
     resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
@@ -3991,7 +3991,7 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
-      '@types/node': ^20.19.0 || >=22.12.0
+      '@types/node': ^20
       '@vitejs/devtools': ^0.4.0 || ^0.5.0
       esbuild: ^0.27.0 || ^0.28.0
       jiti: '>=1.21.0'
@@ -4036,7 +4036,7 @@ packages:
     peerDependencies:
       '@edge-runtime/vm': '*'
       '@opentelemetry/api': ^1.9.0
-      '@types/node': ^20.0.0 || ^22.0.0 || >=24.0.0
+      '@types/node': ^20
       '@vitest/browser-playwright': 4.1.11
       '@vitest/browser-preview': 4.1.11
       '@vitest/browser-webdriverio': 4.1.11
@@ -4478,7 +4478,7 @@ snapshots:
 
   '@fast-csv/format@4.3.5':
     dependencies:
-      '@types/node': 14.18.63
+      '@types/node': 20.19.43
       lodash.escaperegexp: 4.1.2
       lodash.isboolean: 3.0.3
       lodash.isequal: 4.5.0
@@ -4487,7 +4487,7 @@ snapshots:
 
   '@fast-csv/parse@4.3.6':
     dependencies:
-      '@types/node': 14.18.63
+      '@types/node': 20.19.43
       lodash.escaperegexp: 4.1.2
       lodash.groupby: 4.6.0
       lodash.isfunction: 3.0.9
@@ -5825,8 +5825,6 @@ snapshots:
   '@types/geojson@7946.0.16': {}
 
   '@types/lodash@4.17.25': {}
-
-  '@types/node@14.18.63': {}
 
   '@types/node@20.19.43':
     dependencies:

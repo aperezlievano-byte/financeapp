@@ -244,3 +244,58 @@ export async function rejectPending(
 
   return { ok: true, data: null };
 }
+
+type ImportRowInput = {
+  userId: string;
+  accountId: string;
+  occurredOn: Date;
+  description: string;
+  amountCents: bigint;
+  direction: "in" | "out";
+  sourceRef: string;
+};
+
+// El unico camino que escribe transactions sin pasar por revision (paso 13):
+// una importacion historica que Alejandro ya confirmo al escribirla en su
+// hoja. Idempotente por source_ref -- reimportar el mismo archivo devuelve
+// conflict fila por fila, que import-excel.ts cuenta como "saltada", no
+// como fallo.
+export async function importRow(
+  input: ImportRowInput,
+): Promise<Result<{ transactionId: string }>> {
+  try {
+    const transactionId = await withAudit(
+      {
+        actorId: input.userId,
+        actorKind: "user",
+        action: "import.excel",
+        resourceType: "transaction",
+      },
+      async (tx) => {
+        const created = await tx.transaction.create({
+          data: {
+            userId: input.userId,
+            accountId: input.accountId,
+            occurredOn: input.occurredOn,
+            description: input.description,
+            amountCents: input.amountCents,
+            direction: input.direction,
+            source: "excel_import",
+            sourceRef: input.sourceRef,
+          },
+        });
+        return { result: created.id, resourceId: created.id };
+      },
+    );
+
+    return { ok: true, data: { transactionId } };
+  } catch (error) {
+    if (isUniqueConstraintViolation(error)) {
+      return {
+        ok: false,
+        error: { code: "conflict", message: "Esta fila ya fue importada." },
+      };
+    }
+    throw error;
+  }
+}

@@ -32,3 +32,10 @@ export function pesosToCents(pesos: string): bigint {
   }
   return BigInt(pesos) * 100n;
 }
+
+// Convierte un monto ya numerico (la celda de Excel de import-excel.ts,
+// puede traer decimales) a centavos enteros. Redondea antes de convertir a
+// bigint para no arrastrar el error de punto flotante de *100 directo.
+export function pesosNumberToCents(monto: number): bigint {
+  return BigInt(Math.round(Math.abs(monto) * 100));
+}
