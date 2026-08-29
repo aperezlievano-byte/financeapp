@@ -106,12 +106,12 @@
       "WHEN `formatSignedCOP(45000000n, \"out\")` is called THE SYSTEM SHALL return the exact string `−$450.000` using U+2212 as the sign.",
       "WHEN `createManual` inserts one transaction THE SYSTEM SHALL write exactly one `audit_log` row with `action` equal to `transaction.create` in the same database transaction.",
       "WHEN `commitPending` is called twice with the same pending id THE SYSTEM SHALL return code `conflict` on the second call and leave the `transactions` row count unchanged.",
-      "WHEN `grep` searches `src` for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file."
+      "WHEN `grep` searches `src` (excluding `src/generated/`, which is Prisma's own generated types and not application code) for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file."
     ],
     "verify": [
       "pnpm typecheck",
       "pnpm test tests/unit/money.test.ts tests/integration/commit.test.ts",
-      "grep -rln --include=*.ts -e \"transaction\\.create\" -e \"transaction\\.update\" -e \"transaction\\.updateMany\" src | grep -vx \"src/server/ledger/commit.ts\"; test $? -eq 1"
+      "grep -rln --include=*.ts --exclude-dir=generated -e \"transaction\\.create\" -e \"transaction\\.update\" -e \"transaction\\.updateMany\" src | grep -vx \"src/server/ledger/commit.ts\"; test $? -eq 1"
     ],
     "checkpoint": "step-04-ledger-core",
     "files": [
@@ -121,7 +121,7 @@
       "tests/unit/money.test.ts",
       "tests/integration/commit.test.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E1-T5",

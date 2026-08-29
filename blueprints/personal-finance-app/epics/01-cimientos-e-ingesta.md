@@ -343,15 +343,21 @@ escritor de `transactions`, y el `grep` del Verify lo hace cumplir mecánicament
 3. WHEN `formatSignedCOP(45000000n, "out")` is called THE SYSTEM SHALL return the exact string `−$450.000` using U+2212 as the sign.
 4. WHEN `createManual` inserts one transaction THE SYSTEM SHALL write exactly one `audit_log` row with `action` equal to `transaction.create` in the same database transaction.
 5. WHEN `commitPending` is called twice with the same pending id THE SYSTEM SHALL return code `conflict` on the second call and leave the `transactions` row count unchanged.
-6. WHEN `grep` searches `src` for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file.
+6. WHEN `grep` searches `src` (excluding `src/generated/`, que es tipos generados por Prisma y no código de la aplicación) for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file.
 
 **Verify**
 
 ```bash
 pnpm typecheck
 pnpm test tests/unit/money.test.ts tests/integration/commit.test.ts
-grep -rln --include=*.ts -e "transaction\.create" -e "transaction\.update" -e "transaction\.updateMany" src | grep -vx "src/server/ledger/commit.ts"; test $? -eq 1
+grep -rln --include=*.ts --exclude-dir=generated -e "transaction\.create" -e "transaction\.update" -e "transaction\.updateMany" src | grep -vx "src/server/ledger/commit.ts"; test $? -eq 1
 ```
+
+**`--exclude-dir=generated` es obligatorio, no cosmético.** El `.d.ts` que emite `prisma generate` en
+`src/generated/prisma/` trae ejemplos en sus comentarios TSDoc — literalmente
+`prisma.transaction.create({...})` — que sin esta exclusión hacen que el grep encuentre un archivo
+que no es código propio y el gate quede rojo para siempre. Confirmado corriendo el comando contra el
+cliente generado real.
 
 La última línea sale 0 cuando **ninguna** ruta sobrevive al filtro. Un `test $? -eq 2` sería error de
 `grep` y debe fallar.

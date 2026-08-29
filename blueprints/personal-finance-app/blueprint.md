@@ -921,15 +921,17 @@ git tag step-03-auth
 - [ ] WHEN `formatSignedCOP(45000000n, "out")` is called THE SYSTEM SHALL return the exact string `−$450.000` using U+2212 as the sign.
 - [ ] WHEN `createManual` inserts one transaction THE SYSTEM SHALL write exactly one `audit_log` row with `action` equal to `transaction.create` in the same database transaction.
 - [ ] WHEN `commitPending` is called twice with the same pending id THE SYSTEM SHALL return code `conflict` on the second call and leave the `transactions` row count unchanged.
-- [ ] WHEN `grep` searches `src` for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file.
+- [ ] WHEN `grep` searches `src` (excluyendo `src/generated/`, tipos generados por Prisma, no código de la aplicación) for a write to `transactions` outside `src/server/ledger/commit.ts` THE SYSTEM SHALL find no file.
 
 **Verify**
 ```bash
 pnpm typecheck                                                     # expect: exit 0
 pnpm test tests/unit/money.test.ts tests/integration/commit.test.ts # expect: exit 0, 0 failed
-grep -rln --include=*.ts -e "transaction\.create" -e "transaction\.update" -e "transaction\.updateMany" src \
+grep -rln --include=*.ts --exclude-dir=generated -e "transaction\.create" -e "transaction\.update" -e "transaction\.updateMany" src \
   | grep -vx "src/server/ledger/commit.ts"; test $? -eq 1
 # expect: 1 = ninguna linea sobrevivio al filtro -> esta linea sale 0. 2 seria error de grep y falla.
+# --exclude-dir=generated es obligatorio: el .d.ts que emite `prisma generate` trae ejemplos TSDoc
+# con "prisma.transaction.create(...)" literal, y sin la exclusion el gate queda rojo para siempre.
 ```
 
 **Checkpoint**
@@ -2117,6 +2119,7 @@ Ningún comando los decide. Se ejecutan una vez, al cierre del build, antes de c
 | **Decision: el guard check de §9 paso 2 espera `test $? -eq 1`, no `eq 3`, para `psql -c ... -v ON_ERROR_STOP=1`** | Dejar `eq 3` como decía el blueprint original | Why: descubierto al ejecutar el paso 2 contra Postgres 17 real — el código de salida 3 de psql ("error de script bajo `ON_ERROR_STOP`") solo aplica al modo `-f` (archivo); en modo `-c` (comando inline, el que usan estas dos líneas) un error SQL cae en el código 1 genérico. Confirmado corriendo ambas formas. Sin esta corrección el gate del paso 2 queda rojo para siempre pase lo que pase. Corregido en §9 paso 2, el epic 01 y `tasks.json` (E1-T2, acceptance + verify). Would reverse if: se cambia a `-f`/stdin en vez de `-c`, donde sí aplica el código 3 |
 | **Decision: `@prisma/client-runtime-utils@7.10.0` pinneado como dependencia directa, instalado en el paso 2** | No instalarlo — dejar que quede como dependencia transitiva de `@prisma/client` | Why: descubierto al ejecutar `pnpm build` en el paso 3 (bug latente del paso 2 — ningún comando de su propio `Verify` corre `pnpm build`) — con `output` del cliente generado apuntando fuera de `node_modules` (`src/generated/prisma`), pnpm en modo estricto no le expone las dependencias transitivas del runtime de `@prisma/client`; sin este pin directo, `pnpm build` falla con `Module not found: Can't resolve '@prisma/client-runtime-utils'`. Corregido en §9 paso 2 (Do y §11) y el epic 01. Would reverse if: Prisma deja de dividir el runtime en un paquete separado, o pnpm cambia cómo resuelve `output` fuera de `node_modules` |
 | **Decision: `tsconfig.json` sube `target` de `ES2017` a `ES2020`** | Dejar el `ES2017` que trae el andamio de `create-next-app` | Why: descubierto al ejecutar el paso 2 (build real) — `amount_cents` es `bigint` en todo el diseño (§4, §7) y los literales `0n` que eso implica no compilan bajo `ES2017` (`tsc` los rechaza con `TS2737`). El bump es puramente del type-checker: Next/SWC ya compilaba sintaxis moderna sin mirar este campo. Afecta a todo paso que escriba un literal `bigint`, no solo al 2. Would reverse if: el diseño deja de usar `bigint` para dinero |
+| **Decision: el grep de "único escritor" del paso 4 lleva `--exclude-dir=generated`** | Dejar `grep -rln --include=*.ts -e ... src` sin excluir nada, como decía el blueprint original | Why: descubierto al ejecutar el paso 4 (build real) — el `.d.ts` que emite `prisma generate` en `src/generated/prisma/` trae ejemplos en sus comentarios TSDoc con `prisma.transaction.create(...)` literal; sin la exclusión, el grep encuentra ese archivo generado además de `commit.ts` y el gate queda rojo para siempre pase lo que pase, aunque ningún código propio viole la regla. Confirmado corriendo el comando contra el cliente generado real. Corregido en §9 paso 4, el epic 01 y `tasks.json` (E1-T4, acceptance + verify). Would reverse if: Prisma deja de incluir ejemplos de uso en los comentarios de sus tipos generados |
 
 ### 20.4 What to build next
 
