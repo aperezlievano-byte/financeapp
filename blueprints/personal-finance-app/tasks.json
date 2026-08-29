@@ -383,7 +383,7 @@
       "scripts/parity-check.ts",
       "tests/integration/import-excel.test.ts"
     ],
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "id": "E2-T7",
