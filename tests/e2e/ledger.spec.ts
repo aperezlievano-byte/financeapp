@@ -41,8 +41,14 @@ async function fillManualEntry(
   await page.getByRole("button", { name: "Gasto" }).click();
   await page.getByLabel("Descripción").fill(description);
   await page.getByLabel("Monto (pesos)").fill(amountPesos);
+  // and archived_at is null: cuentas.spec.ts corre antes en la misma suite y
+  // deja una cuenta archivada -- accounts nunca se trunca entre specs (a
+  // diferencia de transactions), y sin este filtro psql puede devolver el
+  // nombre de una cuenta que la UI real jamas muestra como chip (el query
+  // del libro tambien filtra archivedAt: null), dejando el test esperando
+  // para siempre un boton que no va a aparecer.
   const accountName = psql(
-    `select name from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
+    `select name from accounts where user_id = '${APP_USER_ID}' and archived_at is null order by name limit 1`,
   );
   await page
     .getByRole("dialog")
@@ -114,7 +120,7 @@ test("a transaction from a past month is absent from Hoy but visible in Historia
   page,
 }) => {
   const accountId = psql(
-    `select id from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
+    `select id from accounts where user_id = '${APP_USER_ID}' and archived_at is null order by name limit 1`,
   );
   const pastMonth = new Date();
   pastMonth.setMonth(pastMonth.getMonth() - 1);
@@ -144,10 +150,10 @@ test("every interactive control is reachable by keyboard with a visible focus in
   page,
 }) => {
   const firstAccount = psql(
-    `select name from accounts where user_id = '${APP_USER_ID}' order by name limit 1`,
+    `select name from accounts where user_id = '${APP_USER_ID}' and archived_at is null order by name limit 1`,
   );
   const firstCategory = psql(
-    `select name from categories where user_id = '${APP_USER_ID}' order by name limit 1`,
+    `select name from categories where user_id = '${APP_USER_ID}' and archived_at is null order by name limit 1`,
   );
 
   await gotoLedger(page);
