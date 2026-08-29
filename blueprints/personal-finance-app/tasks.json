@@ -204,10 +204,10 @@
     "files": [
       "src/server/ingest/conversation.ts",
       "src/server/ingest/pipeline.ts",
-      "src/server/ingest/telegram.ts",
+      "src/app/api/webhooks/telegram/route.ts",
       "tests/integration/telegram-confirm.test.ts"
     ],
-    "status": "pending"
+    "status": "done"
   },
   {
     "id": "E2-T1",

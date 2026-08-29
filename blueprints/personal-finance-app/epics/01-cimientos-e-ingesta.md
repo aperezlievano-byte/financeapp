@@ -469,8 +469,11 @@ cambiarlo.
 **Files**
 - `src/server/ingest/conversation.ts` — new: estado persistido, `expires_at = now() + 24h`
 - `src/server/ingest/pipeline.ts` — new: normalizado -> dedupe -> allowlist -> extracción
-- `src/server/ingest/telegram.ts` — edit: conecta el pipeline y las respuestas
-- `tests/integration/telegram-confirm.test.ts` — new
+- `src/app/api/webhooks/telegram/route.ts` — edit: llama a `processMessage` después de escribir
+  `inbound_messages`, envuelto en `try/catch` — un fallo del pipeline no debe tumbar el webhook
+  (`reply` de `telegram.ts` ya quedó implementado en E1-T6, no hace falta tocarlo acá)
+- `tests/integration/telegram-confirm.test.ts` — new: prueba `pipeline.ts` directo contra un
+  `IngestChannel` falso, no el webhook real
 
 **Acceptance**
 
